@@ -26,25 +26,25 @@ def generate_points(dim,npoint,low=-10,high=10):
     scaled_points = np.array(list(map(list, zip(*scaled_points))))
     return scaled_points
 
-def objective_function(x): # x:tuple n-dimension
-    f = 0
-    """Schwefel"""
-    # for i in range (len(x)):
-    #     sum_sq = 0
-    #     for j in range (i+1):
-    #         sum_sq += x[j]
-    #     f += sum_sq**2 
-    # """2^n Minima"""
-    # for i in range (len(x)):
-    #     f += (x[i]**4-16*x[i]**2+5*x[i])
-    """Rastrigin"""
-    # for i in range (len(x)):
-    #     f += (x[i]**2-10*np.cos(2*np.pi*x[i])+10)
-    """Problem 1 Papernya Pak Kun"""
-    f1 = np.exp(x[0]-x[1])-np.sin(x[0]+x[1])
-    f2 = (x[0]*x[1])**2-np.cos(x[0]+x[1])
-    f = 1/(1+np.abs(f1)+np.abs(f2))
-    return f
+# def objective_function(x): # x:tuple n-dimension
+#     f = 0
+#     """Schwefel"""
+#     # for i in range (len(x)):
+#     #     sum_sq = 0
+#     #     for j in range (i+1):
+#     #         sum_sq += x[j]
+#     #     f += sum_sq**2 
+#     # """2^n Minima"""
+#     # for i in range (len(x)):
+#     #     f += (x[i]**4-16*x[i]**2+5*x[i])
+#     """Rastrigin"""
+#     # for i in range (len(x)):
+#     #     f += (x[i]**2-10*np.cos(2*np.pi*x[i])+10)
+#     """Problem 1 Papernya Pak Kun"""
+#     f1 = np.exp(x[0]-x[1])-np.sin(x[0]+x[1])
+#     f2 = (x[0]*x[1])**2-np.cos(x[0]+x[1])
+#     f = 1/(1+np.abs(f1)+np.abs(f2))
+#     return f
 
 def generate_Rij(i,j,dim,theta):
     Rn_ij= np.eye(dim)
@@ -63,7 +63,7 @@ def generate_Rn(dim,theta):
         Rn *= product
     return Rn
 
-def maximize(set_of_points):
+def maximize(set_of_points,objective_function):
     z = []
     z_max = 0
     for i in range (len(set_of_points)):
@@ -74,8 +74,8 @@ def maximize(set_of_points):
     x_max = set_of_points[idx_max]
     return z_max,idx_max,x_max
 
-def update_point(set_of_points,Sn,dim):
-    (z_star,idx_star,x_star) = maximize(set_of_points)
+def update_point(set_of_points,Sn,dim,objective_function):
+    (z_star,idx_star,x_star) = maximize(set_of_points,objective_function)
     new_set_of_points = np.copy(set_of_points)
     for i in range (len(new_set_of_points)):
         # perkalian matriks
@@ -91,7 +91,7 @@ def iter_error(set_of_points,iter,npoint):
             err = diff
     return err
     
-def SpiralOpt(low_point,high_point, dim, npoint,r = 0.95,theta=np.pi/4, iter_max=100, error_max = 10**(-5),random=0, show_err=False, show_objective_function=False):
+def SpiralOpt(low_point,high_point,objective_function, dim, npoint,r = 0.95,theta=np.pi/4, iter_max=100, error_max = 10**(-5),random=0, show_err=False, show_objective_function=False):
     np.random.seed(random)
     iter_points = {}
     iter = 0
@@ -99,7 +99,7 @@ def SpiralOpt(low_point,high_point, dim, npoint,r = 0.95,theta=np.pi/4, iter_max
     Rn = generate_Rn(dim,theta)
     Sn = r*Rn
     while iter <= iter_max :
-        iter_points[iter+1] = update_point(iter_points[iter],Sn,dim)
+        iter_points[iter+1] = update_point(iter_points[iter],Sn,dim,objective_function)
         error = iter_error(iter_points,iter+1,npoint)
         if error < error_max:
             break
