@@ -67,10 +67,16 @@ def maximize(set_of_points,objective_function):
     z = []
     z_max = 0
     for i in range (len(set_of_points)):
-        z.append(objective_function(set_of_points.T)[i])
-        if z[i]>z_max:
-            z_max = z[i]
-            idx_max = i
+        if len(set_of_points.T) == 1: # ini sifat dari numpy python dimana arraynya malah dobel klo ga diginiin
+            z.append(objective_function(set_of_points.T)[0,i])
+            if z[i]>z_max:
+                z_max = z[i]
+                idx_max = i
+        else:
+            z.append(objective_function(set_of_points.T)[i])
+            if z[i]>z_max:
+                z_max = z[i]
+                idx_max = i
     x_max = set_of_points[idx_max]
     return z_max,idx_max,x_max
 

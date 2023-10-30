@@ -123,12 +123,17 @@ def generate_points(dim,npoint,low=-10,high=10):
 def maximize(set_of_points,objective_function):
     z = []
     z_max = 0
-    F = objective_function(set_of_points.T)
     for i in range (len(set_of_points)):
-        z.append(F[i])
-        if z[i]>z_max:
-            z_max = z[i]
-            idx_max = i
+        if len(set_of_points.T) == 1: # ini sifat dari numpy python dimana arraynya malah dobel klo ga diginiin
+            z.append(objective_function(set_of_points.T)[0,i])
+            if z[i]>z_max:
+                z_max = z[i]
+                idx_max = i
+        else:
+            z.append(objective_function(set_of_points.T)[i])
+            if z[i]>z_max:
+                z_max = z[i]
+                idx_max = i
     x_max = set_of_points[idx_max]
     return z_max,idx_max,x_max
 
@@ -182,7 +187,11 @@ def root_SpiralOpt(objective_function,m_cluster,gamma,epsilon,delta,k_cluster,m,
         potential_cluster_center = []
         F = objective_function(iter_points[k].T)
         for i in range (m_cluster):
-            if F[i] > gamma:
+            if len(iter_points[k].T) == 1:
+                fungam = F[0][i]
+            else:
+                fungam = F[i]
+            if fungam > gamma:
                 potential_cluster_center.append(iter_points[k][i])
         # len(potential_cluster_center)
         # print('')
@@ -192,7 +201,7 @@ def root_SpiralOpt(objective_function,m_cluster,gamma,epsilon,delta,k_cluster,m,
             function_cluster(potential_cluster_center[i],lendict,objective_function,cluster_center,cluster_radius)
             # print(cluster_center,cluster_radius)
             # print('')
-        iter_points[k+1]=update_point(iter_points[k],Sn,dim,objective_function=objective_function)
+        iter_points[k+1]=update_point(iter_points[k],Sn,dim=dim,objective_function=objective_function)
         k+=1
     roots = []
     roots_values = []
@@ -203,9 +212,13 @@ def root_SpiralOpt(objective_function,m_cluster,gamma,epsilon,delta,k_cluster,m,
         root,value = SpiralOpt(lp,hp,objective_function,dim,npoint=m,r = r,theta=theta, iter_max=k_max, error_max = 10**(-5),random=0, show_err=False, show_objective_function=False)
         roots.append(root)
         roots_values.append(value)
-    print(roots)
-    print(roots_values)
-    eligible_roots = np.array([x for x in roots if (1-objective_function(x))<epsilon])
+    # print(roots)
+    # print(roots_values)
+    if dim == 1:
+        list_criteria = [element for sublist in roots for element in sublist] #convert from 2D array into 1D array
+    else:
+        list_criteria = roots
+    eligible_roots = np.array([x for x in list_criteria if (1-objective_function(x))<epsilon])
     duplicated_roots = []
     for i in range(len(eligible_roots)):
         for j in range (i+1,len(eligible_roots)):
@@ -217,15 +230,31 @@ def root_SpiralOpt(objective_function,m_cluster,gamma,epsilon,delta,k_cluster,m,
     for i in range (len(duplicated_roots)):
         root_a = objective_function(duplicated_roots[i][0])
         root_b = objective_function(duplicated_roots[i][1])
-        if root_a>root_b:
-            deselected_duplicated_roots.append(list(duplicated_roots[i][1]))
+        if dim == 1:
+            if root_a>root_b:
+                duplicated_root = duplicated_roots[i][1]
+            else:
+                duplicated_root = duplicated_roots[i][0]
         else:
-            deselected_duplicated_roots.append(list(duplicated_roots[i][0]))
+            if root_a>root_b:
+                duplicated_root = list(duplicated_roots[i][1])
+            else:
+                duplicated_root = list(duplicated_roots[i][0])
+        deselected_duplicated_roots.append(duplicated_root)
     # print(deselected_duplicated_roots)
+    if dim == 1:
+        # Reshape the 1D array to have one column
+        deselected_duplicated_roots = np.array(deselected_duplicated_roots).reshape(-1, 1)
 
-    if deselected_duplicated_roots:
-        exclude_condition = np.all(eligible_roots != np.array(deselected_duplicated_roots)[:, np.newaxis], axis=2).all(axis=0)
+        # Compare the 2D array with the reshaped 1D array
+        exclude_condition = np.all(eligible_roots != deselected_duplicated_roots, axis=0)
+
+        # Use the boolean mask to filter eligible_roots
         final_root = eligible_roots[exclude_condition]
     else:
-        final_root = eligible_roots
+        if deselected_duplicated_roots:
+            exclude_condition = np.all(eligible_roots != np.array(deselected_duplicated_roots)[:, np.newaxis], axis=2).all(axis=0)
+            final_root = eligible_roots[exclude_condition]
+        else:
+            final_root = eligible_roots
     return final_root
