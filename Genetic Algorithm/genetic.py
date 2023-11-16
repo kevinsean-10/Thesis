@@ -114,5 +114,3 @@ def run_evolution(
         population = next_generation
 
     return population, i
-
-print(generate_population(10,10))
