@@ -1,30 +1,32 @@
 import numpy as np
 import sobol_seq
+import matplotlib.pyplot as plt
 
-# def generate_points(dim,npoint,low=-10,high=10):
-#     if type(low) != type(high):
-#         raise TypeError('The type of "low" and "high" should be the same.')
-#     if type(low) == int:
-#         boundaries = [(low,high) for _ in range (dim)]
-#     elif type(low) == list or type(low) == np.ndarray:
-#         if len(low) != len(high):
-#             raise TypeError('The length of "low" and "high" should be the same.')
-#         else:
-#             boundaries = [(low[i],high[i]) for i in range (len(low))]
+"""GENERATE POINTS USING SOBOL SEQUENCE"""
+def generate_points(dim,npoint,low=-10,high=10):
+    if type(low) != type(high):
+        raise TypeError('The type of "low" and "high" should be the same.')
+    if type(low) == int:
+        boundaries = [(low,high) for _ in range (dim)]
+    elif type(low) == list or type(low) == np.ndarray:
+        if len(low) != len(high):
+            raise TypeError('The length of "low" and "high" should be the same.')
+        else:
+            boundaries = [(low[i],high[i]) for i in range (len(low))]
 
-#     # Generate Sobol sequence points
-#     sobol_points = sobol_seq.i4_sobol_generate(dim, npoint)
+    # Generate Sobol sequence points
+    sobol_points = sobol_seq.i4_sobol_generate(dim, npoint)
 
-#     # Scale the Sobol points to fit within the specified boundaries
-#     scaled_points = []
-#     for i in range(dim):
-#         a, b = boundaries[i]
-#         scaled_dim = a + sobol_points[:, i] * (b - a)
-#         scaled_points.append(scaled_dim)
+    # Scale the Sobol points to fit within the specified boundaries
+    scaled_points = []
+    for i in range(dim):
+        a, b = boundaries[i]
+        scaled_dim = a + sobol_points[:, i] * (b - a)
+        scaled_points.append(scaled_dim)
 
-#     # Trane the scaled points to get points per dimension
-#     scaled_points = np.array(list(map(list, zip(*scaled_points))))
-#     return scaled_points
+    # Trane the scaled points to get points per dimension
+    scaled_points = np.array(list(map(list, zip(*scaled_points))))
+    return scaled_points
 
 def generate_Rij(i,j,dim,theta):
     Rn_ij= np.eye(dim)
@@ -93,31 +95,7 @@ def SpiralOpt(low_point,high_point,objective_function, dim, npoint,r = 0.95,thet
         print(obj_fun)
     return return_points, obj_fun
 
-"""GENERATE POINTS USING SOBOL SEQUENCE"""
-def generate_points(dim,npoint,low=-10,high=10):
-    if type(low) != type(high):
-        raise TypeError('The type of "low" and "high" should be the same.')
-    if type(low) == int:
-        boundaries = [(low,high) for _ in range (dim)]
-    elif type(low) == list or type(low) == np.ndarray:
-        if len(low) != len(high):
-            raise TypeError('The length of "low" and "high" should be the same.')
-        else:
-            boundaries = [(low[i],high[i]) for i in range (len(low))]
 
-    # Generate Sobol sequence points
-    sobol_points = sobol_seq.i4_sobol_generate(dim, npoint)
-
-    # Scale the Sobol points to fit within the specified boundaries
-    scaled_points = []
-    for i in range(dim):
-        a, b = boundaries[i]
-        scaled_dim = a + sobol_points[:, i] * (b - a)
-        scaled_points.append(scaled_dim)
-
-    # Trane the scaled points to get points per dimension
-    scaled_points = np.array(list(map(list, zip(*scaled_points))))
-    return scaled_points
 
 """MAXIMIZE FUNCTION"""
 def maximize(set_of_points,objective_function):
@@ -168,10 +146,9 @@ def function_cluster(y,lendict,objective_function,cluster_center,cluster_radius)
 def cluster_boundaries(center_point,radius):
     return np.array([[center_point[i]-radius,center_point[i]+radius]for i in range (len(center_point))])
 
-def root_SpiralOpt(objective_function,m_cluster,gamma,epsilon,delta,k_cluster,m,r,theta,k_max,dim):
+def root_SpiralOpt(objective_function,m_cluster,gamma,epsilon,delta,k_cluster,m,r,theta,k_max,dim,boundaries,cluster_visualization2D = False,error_max = 10**(-5),random:int =0, show_err=False, show_objective_function=False):
     k=0
     iter_points = {}
-    boundaries = np.array([(-10,10) for _ in range (dim)])
     iter_points[k] = generate_points(dim,m_cluster,boundaries[:,0],boundaries[:,1])
     x_prime = maximize(iter_points[0],objective_function)[-1]
     min_boundaries = 10**100
@@ -203,13 +180,41 @@ def root_SpiralOpt(objective_function,m_cluster,gamma,epsilon,delta,k_cluster,m,
             # print('')
         iter_points[k+1]=update_point(iter_points[k],Sn,dim=dim,objective_function=objective_function)
         k+=1
+    if cluster_visualization2D == True:
+        if dim != 2:
+            print(f"Dimension {dim} can be visualized using cluster_visualization2D.")
+        """Visualization"""
+        fig, ax = plt.subplots()
+        for center,radius in zip(cluster_center.values(),cluster_radius.values()):
+            circle = plt.Circle(center, radius, fill=False, linestyle='dotted', edgecolor='b')
+            ax.add_artist(circle)
+
+        # Set axis limits
+        ax.set_xlim(boundaries[0])
+        ax.set_ylim(boundaries[1])
+        # ax.autoscale_view()
+
+        # # Add labels (optional)
+        # for i, center in cluster_center.items():
+        #     ax.text(center[0], center[1], f'Cluster {i+1}', ha='center', va='bottom')
+
+        # Add a title and labels (optional)
+        ax.set_title('Cluster Visualization')
+        ax.set_xlabel('X-axis')
+        ax.set_ylabel('Y-axis')
+
+        # Show the plot
+        plt.gca().set_aspect('equal', adjustable='box')  # Make the aspect ratio equal
+        plt.grid(True)
+        plt.show()
+
     roots = []
     roots_values = []
     for i in range (len(cluster_center)):
         bound = cluster_boundaries(cluster_center[i],cluster_radius[i])
         lp = bound[:,0]
         hp = bound[:,1]
-        root,value = SpiralOpt(lp,hp,objective_function,dim,npoint=m,r = r,theta=theta, iter_max=k_max, error_max = 10**(-5),random=0, show_err=False, show_objective_function=False)
+        root,value = SpiralOpt(lp,hp,objective_function,dim,npoint=m,r = r,theta=theta, iter_max=k_max, error_max = error_max,random=random, show_err=show_err, show_objective_function=show_objective_function)
         roots.append(root)
         roots_values.append(value)
     # print(roots)
