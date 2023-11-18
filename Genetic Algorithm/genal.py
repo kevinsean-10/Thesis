@@ -15,6 +15,7 @@ CrossoverFunc = Callable[[Genome, Genome], Tuple[Genome, Genome]]
 MutationFunc = Callable[[Genome], Genome]
 PrinterFunc = Callable[[Population, int, FitnessFunc], None]
 
+
 """GENERATE POINTS USING SOBOL SEQUENCE"""
 def generate_points(dim,npoint,low=-10,high=10):
     if type(low) != type(high):
@@ -39,7 +40,7 @@ def generate_points(dim,npoint,low=-10,high=10):
 
     # Transpose the scaled points to get points per dimension
     scaled_points = np.array(list(map(list, zip(*scaled_points))))
-    return scaled_points
+    return scaled_points 
 
 def encode_number(number, min_value=-10, max_value=10, num_bits=32):
     # Normalize the number to a value between 0 and 1
@@ -97,7 +98,7 @@ def mutation(genome: Genome, num: int = 1, probability: float = 0.5) -> Genome:
         genome[index] = genome[index] if random() > probability else abs(genome[index] - 1)
     return genome
 
-def fitness_function(genome: Genome, objective_function,min_value=-10, max_value=10, num_bits=32) -> float:
+def fitness_function(genome: Genome,objective_function, min_value=-10, max_value=10, num_bits=64) -> float:
     X = decode_list(genome, min_value, max_value, num_bits)
     return objective_function(X)
 
@@ -105,37 +106,44 @@ def fitness_function(genome: Genome, objective_function,min_value=-10, max_value
 def population_fitness(population: Population, fitness_func: FitnessFunc) -> float:
     return sum([fitness_func(genome) for genome in population])
 
-def selection_pair(population: Population, fitness_func: FitnessFunc) -> Population:
-    return choices(
-        population=population,
-        weights=[fitness_func(gene) for gene in population],
-        k=2
-    )
+def selection_pair(population: Population,population_fitness_func, fitness_func: FitnessFunc,minimize=True) -> Population:
+    total_sum = population_fitness_func(population,fitness_func)
+    if minimize == True:
+        return choices(
+            population=population,
+            weights=[(total_sum-fitness_func(gene))/total_sum for gene in population],
+            k=2
+        )
+    else:
+            return choices(
+            population=population,
+            weights=[fitness_func(gene) for gene in population],
+            k=2
+        )
 def sort_population(population: Population, fitness_func: FitnessFunc, minimize=True) -> Population:
     return sorted(population,key= lambda x: fitness_func(x), reverse=not minimize)
 
 def genome_to_string(genome: Genome) -> str:
     return "".join(map(str, genome))
 
-def print_stats(population: Population, generation_id: int, fitness_func: FitnessFunc,num_bits=64,binary_mode=False):
+def print_stats(population: Population, generation_id: int, fitness_func: FitnessFunc, decode_list_func,binary_mode=False):
     print("GENERATION %02d" % generation_id)
     print("=============")
     if binary_mode == True:
         print("Population: [%s]" % ", ".join([genome_to_string(gene) for gene in population]))
         print("Avg. Fitness: %f" % (population_fitness(population, fitness_func) / len(population)))
-        sorted_population = sort_population(population, fitness_func)
+        print("Worst solution: %s (%f)" % (genome_to_string(population[-1]),
+                                fitness_func(population[-1])))
         print(
-            "Best: %s (%f)" % (genome_to_string(sorted_population[0]), fitness_func(sorted_population[0])))
-        print("Worst: %s (%f)" % (genome_to_string(sorted_population[-1]),
-                                fitness_func(sorted_population[-1])))
+            "Best solution: %s (%f)" % (genome_to_string(population[0]), fitness_func(population[0])))
         print("")
     else:
-        print(f"Population: {[decode_list(population[i],num_bits=num_bits) for i in range (len(population))]}")
+        print(f"Population: {[decode_list_func(population[i]) for i in range (len(population))]}")
         print("Avg. Fitness: %f" % (population_fitness(population, fitness_func) / len(population)))
-        sorted_population = sort_population(population, fitness_func)
-        print(f"Best: {(decode_list(population[0],num_bits=num_bits))}")
-        print(f"Worst: {(decode_list(population[1],num_bits=num_bits))}")
+        print(f"Worst solution: {(decode_list_func(population[-1]))} with value {fitness_func(population[-1])}")
+        print(f"Best solution: {(decode_list_func(population[0]))} with value {fitness_func(population[0])}")
         print("")
+    # return sorted_population[0]
 
 def run_evolution(
         populate_func,
@@ -147,29 +155,32 @@ def run_evolution(
         mutation_func: MutationFunc = mutation,
         sort_func = sort_population,
         generation_limit: int = 100,
-        num_bits:int=64,
         printer: Optional[PrinterFunc] = None) \
         -> Tuple[Population, int]:
     population = populate_func()
 
     for i in range(generation_limit):
-        population = sort_func(population,fitness_func)
+        # print(f"i={i}")
+        population = sort_func(population,minimize=minimize)
 
         if printer is not None:
-            printer(population, i, fitness_func,num_bits)
+            printer(population, i)
 
         if minimize==True:
             cutoff_criteria = fitness_func(population[0])
         else:
             cutoff_criteria = 1-fitness_func(population[0])
-
+        print(f"cutoff:{cutoff_criteria}\n")
+        # print(decode_list(population[0],min_value=min_value,max_value=max_value,num_bits=64))
         if cutoff_criteria < fitness_limit:
             break
 
         next_generation = population[0:2]
 
         for j in range(int(len(population) / 2) - 1):
-            parents = selection_func(population)
+            parents = selection_func(population,minimize=minimize)
+            # print(f"j={j}")
+            # print(decode_list(parents[0],min_value=min_value,max_value=max_value,num_bits=64),decode_list(parents[1],min_value=min_value,max_value=max_value,num_bits=64))
             offspring_a, offspring_b = crossover_func(parents[0], parents[1])
             offspring_a = mutation_func(offspring_a)
             offspring_b = mutation_func(offspring_b)
@@ -179,39 +190,4 @@ def run_evolution(
 
     return population, i
 
-n_point = 100
-k_max = 100
-dim = 3
-epsilon = 10**(-7)
-def objective_function(x):
-    f=0
-    for i in range (len(x)):
-        f += (x[i]**2-10*np.cos(2*np.pi*x[i])+10)
-    return f
-boundaries = np.array([(-5,5) for _ in range (dim)])
-min_value = boundaries.min()
-max_value = boundaries.max()
-num_bits = 64  # Number of bits for each number
-iter_points = generate_points(dim,n_point,boundaries[:,0],boundaries[:,1])
-popA = generate_population(iter_points,num_bits=num_bits,min_value=min_value,max_value=max_value)
-decoded_genome = [decode_list(popA[i],num_bits=num_bits) for i in range (len(popA))]
-population,generation = run_evolution(
-    populate_func=partial(
-        generate_population,set_of_points = iter_points,num_bits=num_bits,min_value=min_value,max_value=max_value
-    ),
-    fitness_func= partial(
-        fitness_function, objective_function=objective_function,num_bits=num_bits,min_value=min_value,max_value=max_value
-    ),
-    minimize=True,
-    sort_func=partial(
-        sort_population,minimize=True),
-    selection_func=partial(selection_pair,
-                           fitness_func=partial(
-                               fitness_function,
-                               num_bits=num_bits,
-                               min_value=min_value,max_value=max_value
-                           )),
-    fitness_limit=epsilon,
-    generation_limit=k_max
-)
-print(decode_list(population[0],num_bits=num_bits))
+
