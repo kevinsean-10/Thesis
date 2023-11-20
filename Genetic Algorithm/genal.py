@@ -170,7 +170,7 @@ def run_evolution(
             cutoff_criteria = fitness_func(population[0])
         else:
             cutoff_criteria = 1-fitness_func(population[0])
-        print(f"cutoff:{cutoff_criteria}\n")
+        # print(f"cutoff:{cutoff_criteria}\n")
         # print(decode_list(population[0],min_value=min_value,max_value=max_value,num_bits=64))
         if cutoff_criteria < fitness_limit:
             break
