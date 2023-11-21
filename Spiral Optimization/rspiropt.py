@@ -146,7 +146,23 @@ def function_cluster(y,lendict,objective_function,cluster_center,cluster_radius)
 def cluster_boundaries(center_point,radius):
     return np.array([[center_point[i]-radius,center_point[i]+radius]for i in range (len(center_point))])
 
-def root_SpiralOpt(objective_function,m_cluster,gamma,epsilon,delta,k_cluster,m,r,theta,k_max,dim,boundaries,cluster_visualization2D = False,error_max = 10**(-5),random:int =0, show_err=False, show_objective_function=False):
+def root_SpiralOpt(objective_function,
+                   m_cluster,
+                   gamma,
+                   epsilon,
+                   delta,
+                   k_cluster,
+                   m,
+                   r,
+                   theta,
+                   k_max,
+                   dim,
+                   boundaries,
+                   cluster_visualization2D = False,
+                   error_max = 10**(-5),
+                   random:int =0, 
+                   show_err=False, 
+                   show_objective_function=False):
     k=0
     iter_points = {}
     iter_points[k] = generate_points(dim,m_cluster,boundaries[:,0],boundaries[:,1])
