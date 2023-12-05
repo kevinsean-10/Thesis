@@ -106,22 +106,15 @@ def fitness_function(genome: Genome,objective_function, min_value=-10, max_value
 def population_fitness(population: Population, fitness_func: FitnessFunc) -> float:
     return sum([fitness_func(genome) for genome in population])
 
-def selection_pair(population: Population,population_fitness_func, fitness_func: FitnessFunc,minimize=True) -> Population:
+def selection_pair(population: Population,population_fitness_func, fitness_func: FitnessFunc) -> Population:
     total_sum = population_fitness_func(population,fitness_func)
-    if minimize == True:
-        return choices(
-            population=population,
-            weights=[(total_sum-fitness_func(gene))/total_sum for gene in population],
-            k=2
-        )
-    else:
-            return choices(
-            population=population,
-            weights=[fitness_func(gene) for gene in population],
-            k=2
-        )
-def sort_population(population: Population, fitness_func: FitnessFunc, minimize=True) -> Population:
-    return sorted(population,key= lambda x: fitness_func(x), reverse=not minimize)
+    return choices(
+        population=population,
+        weights=[(total_sum-fitness_func(gene))/total_sum for gene in population],
+        k=2
+    )
+def sort_population(population: Population, fitness_func: FitnessFunc) -> Population:
+    return sorted(population,key= lambda x: fitness_func(x), reverse=False)
 
 def genome_to_string(genome: Genome) -> str:
     return "".join(map(str, genome))
@@ -138,8 +131,8 @@ def print_stats(population: Population, generation_id: int, fitness_func: Fitnes
             "Best solution: %s (%f)" % (genome_to_string(population[0]), fitness_func(population[0])))
         print("")
     else:
-        print(f"Population: {[decode_list_func(population[i]) for i in range (len(population))]}")
-        print("Avg. Fitness: %f" % (population_fitness(population, fitness_func) / len(population)))
+        # print(f"Population: {[decode_list_func(population[i]) for i in range (len(population))]}")
+        # print("Avg. Fitness: %f" % (population_fitness(population, fitness_func) / len(population)))
         print(f"Worst solution: {(decode_list_func(population[-1]))} with value {fitness_func(population[-1])}")
         print(f"Best solution: {(decode_list_func(population[0]))} with value {fitness_func(population[0])}")
         print("")
@@ -149,27 +142,25 @@ def run_evolution(
         populate_func,
         fitness_func,
         fitness_limit: int,
-        minimize = False,
         selection_func: SelectionFunc = selection_pair,
         crossover_func: CrossoverFunc = single_point_crossover,
         mutation_func: MutationFunc = mutation,
         sort_func = sort_population,
         generation_limit: int = 100,
+        seed: int = 0,
         printer: Optional[PrinterFunc] = None) \
         -> Tuple[Population, int]:
+    np.random.seed(seed)
     population = populate_func()
 
     for i in range(generation_limit):
         # print(f"i={i}")
-        population = sort_func(population,minimize=minimize)
+        population = sort_func(population)
 
         if printer is not None:
             printer(population, i)
 
-        if minimize==True:
-            cutoff_criteria = fitness_func(population[0])
-        else:
-            cutoff_criteria = 1-fitness_func(population[0])
+        cutoff_criteria = fitness_func(population[0])
         # print(f"cutoff:{cutoff_criteria}\n")
         # print(decode_list(population[0],min_value=min_value,max_value=max_value,num_bits=64))
         if cutoff_criteria < fitness_limit:
@@ -178,7 +169,7 @@ def run_evolution(
         next_generation = population[0:2]
 
         for j in range(int(len(population) / 2) - 1):
-            parents = selection_func(population,minimize=minimize)
+            parents = selection_func(population)
             # print(f"j={j}")
             # print(decode_list(parents[0],min_value=min_value,max_value=max_value,num_bits=64),decode_list(parents[1],min_value=min_value,max_value=max_value,num_bits=64))
             offspring_a, offspring_b = crossover_func(parents[0], parents[1])
@@ -190,4 +181,64 @@ def run_evolution(
 
     return population, i
 
+from random import choices, randint, randrange, random,seed
+from typing import List, Optional, Callable, Tuple
+import numpy as np
+import pandas as pd
+import sobol_seq
+import matplotlib.pyplot as plt
+from functools import partial
 
+n_point = 100
+k_max = 100
+dim = 2
+epsilon = 10**(-5)
+p_mutation = 0.1
+num_bits = 64  # Number of bits for each number
+
+def objective_function(x):
+    F = (x[0]-3)**2 + (x[1]-2)**2
+    return F
+
+boundaries = np.array([(-10,10) for _ in range (dim)])
+
+min_value = boundaries.min()
+max_value = boundaries.max()
+
+iter_points = generate_points(dim,n_point,boundaries[:,0],boundaries[:,1])
+
+population,generation = run_evolution(
+    populate_func=partial(
+        generate_population,set_of_points = iter_points,num_bits=num_bits,min_value=min_value,max_value=max_value
+    ),
+    fitness_func= partial(
+        fitness_function,objective_function=objective_function, num_bits=num_bits,min_value=min_value,max_value=max_value
+    ),
+    sort_func=partial(
+        sort_population,
+        fitness_func=partial(
+            fitness_function,
+            objective_function=objective_function,
+            num_bits=num_bits,
+            min_value=min_value,max_value=max_value   
+        )),
+    selection_func=partial(
+        selection_pair,
+        population_fitness_func=population_fitness,
+        fitness_func=partial(
+            fitness_function,
+            objective_function=objective_function,
+            num_bits=num_bits,
+            min_value=min_value,max_value=max_value)),
+    mutation_func=partial(
+        mutation,probability=p_mutation
+    ),
+    fitness_limit=epsilon,
+    generation_limit=k_max,
+    printer=partial(print_stats,fitness_func=partial(
+        fitness_function,objective_function=objective_function,max_value=max_value,min_value=min_value,num_bits=num_bits
+        ),decode_list_func=partial(
+            decode_list,min_value=min_value,max_value=max_value,num_bits=num_bits)
+        ),
+    seed=10
+)
