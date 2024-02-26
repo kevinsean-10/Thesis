@@ -73,7 +73,18 @@ def iter_error(set_of_points,iter,npoint):
             err = diff
     return err
     
-def SpiralOpt(low_point,high_point,objective_function, dim, npoint,r = 0.95,theta=np.pi/4, iter_max=100, error_max = 10**(-5),random=0, show_err=False, show_objective_function=False):
+def SpiralOpt(low_point,
+              high_point,
+              objective_function, 
+              dim, 
+              npoint,
+              r = 0.95,
+              theta=np.pi/4, 
+              iter_max=100, 
+              error_max = 10**(-5),
+              random=0, 
+              show_err=False, 
+              show_objective_function=False):
     np.random.seed(random)
     iter_points = {}
     iter = 0
