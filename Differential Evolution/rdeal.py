@@ -1,12 +1,6 @@
 import numpy as np
 from functools import partial
-
-def root_objective_function(x:np.ndarray):
-    res = 0
-    F_array = objective_function(x)
-    for f in F_array:
-        res +=(f)**2
-    return res
+import sobol_seq
 
 def chi_p(delta_j, rho):
     """
@@ -31,7 +25,6 @@ def repulsion_function(x,
     Rx += f_x
     return Rx
 
-
 def fitness_function(x,
                      archive,
                      objective_func,
@@ -45,14 +38,44 @@ def fitness_function(x,
     else:
         return repulsion_func(x,archive)
     
-def initialize_population(pop_size, dimensions, bounds):
+def generate_points(dim: int,
+                    npoint:int,
+                    low=-10,
+                    high=10,
+                    sobol = True):
     """
-    Initialization function for the population
+    Generate points with option to use sobol sequence
     """
-    population = np.random.rand(pop_size, dimensions)
-    lower_bounds, upper_bounds = np.asarray(bounds).T
-    diff = np.fabs(lower_bounds - upper_bounds)
-    return lower_bounds + population * diff
+    if type(low) != type(high):
+        raise TypeError('The type of "low" and "high" should be the same.')
+    if type(low) == int:
+        boundaries = [(low,high) for _ in range (dim)]
+    elif type(low) == list or type(low) == np.ndarray:
+        if len(low) != len(high):
+            raise TypeError('The length of "low" and "high" should be the same.')
+        else:
+            boundaries = [(low[i],high[i]) for i in range (len(low))]
+
+    if sobol == True:
+        # Generate Sobol sequence points
+        sobol_points = sobol_seq.i4_sobol_generate(dim, npoint)
+        # Scale the Sobol points to fit within the specified boundaries
+        scaled_points = []
+        for i in range(dim):
+            a, b = boundaries[i]
+            scaled_dim = a + sobol_points[:, i] * (b - a)
+            scaled_points.append(scaled_dim)
+        # Transpose the scaled points to get points per dimension
+        scaled_points = np.array(list(map(list, zip(*scaled_points))))
+    
+    else:
+        scaled_points = np.zeros((npoint, dim))
+        for i in range(dim):
+            min_val, max_val = boundaries[i]
+            scaled_points[:, i] = np.random.uniform(min_val, max_val, npoint)
+
+    return scaled_points
+
 
 
 def mutate(population, F):
@@ -249,7 +272,6 @@ def update_history(M_F,M_CR,S_F,S_CR,k):
 
 def RADE(archive, 
          objective_func,
-         repulsion_func,
          bounds, 
          population_size, 
          max_generation, 
@@ -259,12 +281,13 @@ def RADE(archive,
          theta,
          tau_d,
          archive_size_max,
-         print_gen = False):
+         seed=0,
+         print_gen = False,
+         root_history = False):
     """
     INPUT
         archive: list= list of eligible roots
         objective_func: func= objective function to solve the NLS
-        repulsion_func: func= objective function that has been spesialized in replusion technique
         bounds: np.ndarray= boundaries/constraint of the problem
         population_size: int= population size per generation
         max_generation: int= maximal iteration
@@ -280,24 +303,34 @@ def RADE(archive,
         fitness[best_idx]: np.ndarray= best value of objective function
         archive: roots found in the problem
     """
-
+    np.random.seed(seed)
     dimensions = len(bounds)
-    population = initialize_population(population_size, dimensions, bounds)
+    population = generate_points(dim=dimensions,
+                                 npoint=population_size,
+                                 low=bounds[:,0],
+                                 high=bounds[:,1],
+                                 sobol=True)
     fitness = np.asarray([objective_func(ind) for ind in population])
     best_idx = np.argmin(fitness)
-    best = population[best_idx]
+    best = population[best_idx] # objective function must be minimizing
     subpopA = np.array([subpopulating(xi, population, num_l) for xi in population])
-    S_F, S_CR = [],[]
     Hm = len(memories_F)
     k=0
 
+    if root_history == True:
+        history_root = {}
     for gen in range(max_generation):
+        S_F, S_CR = [],[]
         for i in range(population_size):
             F_i,CR_i = update_parameter(memories_F,memories_CR,Hm)
             x_i = population[i]
             mutant = mutation_penalty(x_i,subpopA[i],bounds,F_i)
             trial = crossover(population[i], mutant, CR_i)
-            trial_fitness = repulsion_func(trial)
+            trial_fitness = fitness_function(trial, 
+                                             archive,
+                                             objective_func=objective_func,
+                                             repulsion_func=partial(repulsion_function,
+                                                                    objective_func = objective_func))
             
             if trial_fitness < fitness[i]:
                 fitness[i] = trial_fitness
@@ -319,6 +352,9 @@ def RADE(archive,
             # print(f"Best Fitness: {fitness[best_idx]}")
             print(f'Archive:{archive}')
         
+        if root_history == True:
+            history_root[gen] = archive.copy()
+        
             # print(f'S_F: {S_F}\nS_CR: {S_CR}')
         """Update parameter history"""
         if (len(S_F)!=0) & (len(S_CR)!=0):
@@ -327,4 +363,9 @@ def RADE(archive,
             k +=1
             if k >= Hm:
                 k = 1
-    return best, fitness[best_idx], archive
+
+    
+    if root_history == True:
+        return best, fitness[best_idx], archive, history_root
+    else:
+        return best, fitness[best_idx], archive
