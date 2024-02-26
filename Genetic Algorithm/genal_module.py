@@ -13,13 +13,13 @@ from functools import partial
 ObjectiveFunctionType = Callable[[np.ndarray], np.ndarray]
 BoundariesType = NDArray[np.int_]
 
-def root_objective_function(x,objective_function:ObjectiveFunctionType):
-    F_array = objective_function(x)
-    denom = 0
-    for f in F_array:
-        denom +=np.abs(f)
-    F = 1/(1+denom)
-    return F
+# def root_objective_function(x,objective_function:ObjectiveFunctionType):
+#     F_array = objective_function(x)
+#     denom = 0
+#     for f in F_array:
+#         denom +=np.abs(f)
+#     F = 1/(1+denom)
+#     return F
 
 def slice_hypercube(lower_bounds, upper_bounds, interval, dim):
     # Create a list of arrays, each containing points spaced h apart for each dimension
@@ -39,7 +39,7 @@ def GenAl(n_var,n_obj,xl,xu,objective_function,algorithmGA,termination,seed=1,ve
         def __init__(self):
             super().__init__(n_var=n_var,n_obj=n_obj,xl=xl,xu=xu)
         def _evaluate(self, x, out, *args, **kwargs):
-            out['F'] = -objective_function(x)
+            out['F'] = objective_function(x)
 
     problem = myProblem()
     result = minimize(problem=problem,
@@ -50,6 +50,7 @@ def GenAl(n_var,n_obj,xl,xu,objective_function,algorithmGA,termination,seed=1,ve
     return [result.X,result.F]
 
 def root_GenAl(objective_function:ObjectiveFunctionType,
+               root_objective_function,
                boundaries: BoundariesType,
                dim:int,
                gen_max:int,
@@ -78,7 +79,6 @@ def root_GenAl(objective_function:ObjectiveFunctionType,
 
         # cek jika f yang berubah tanda dari F_list jika dievaluasi di tiap edge hypercube
         product_combination = np.array([[a*b for a,b in combinations(F_list[i],2)] for i in range (F_list.shape[0])])
-
         # jika semua f dari F_list berubah tanda jika dievaluasi di tiap edge hypercube, maka ada akar di situ
         change_sign = np.array([np.any(product_combination[i]<0) for i in range (product_combination.shape[0])])
         if np.all(change_sign==True):
@@ -95,7 +95,7 @@ def root_GenAl(objective_function:ObjectiveFunctionType,
     terminationp1 = DefaultSingleObjectiveTermination(
         xtol=1e-8,
         cvtol=1e-6,
-        ftol=1e-6,
+        ftol=epsilon,
         period=20,
         n_max_gen=gen_max,
         n_max_evals=100000
@@ -107,7 +107,7 @@ def root_GenAl(objective_function:ObjectiveFunctionType,
                            1,
                            xl=cluster[i,:,:][0],
                            xu=cluster[i,:,:][-1],
-                           objective_function=partial(root_objective_function,objective_function=objective_function),
+                           objective_function=root_objective_function,
                            algorithmGA=algorithmGAp1,
                            termination=terminationp1,
                            seed=seed)
@@ -124,7 +124,7 @@ def root_GenAl(objective_function:ObjectiveFunctionType,
         list_criteria = [element for sublist in roots for element in sublist] #convert from 2D array into 1D array
     else:
         list_criteria = roots
-    eligible_roots = np.array([x for x in list_criteria if (1-root_objective_function(x,objective_function=objective_function))<epsilon])
+    eligible_roots = np.array([x for x in list_criteria if root_objective_function(x)<epsilon])
     duplicated_roots = []
     for i in range(len(eligible_roots)):
         for j in range (i+1,len(eligible_roots)):
@@ -134,15 +134,15 @@ def root_GenAl(objective_function:ObjectiveFunctionType,
 
     deselected_duplicated_roots = []
     for i in range (len(duplicated_roots)):
-        value_root_a = root_objective_function(duplicated_roots[i][0],objective_function=objective_function)
-        value_root_b = root_objective_function(duplicated_roots[i][1],objective_function=objective_function)
+        value_root_a = root_objective_function(duplicated_roots[i][0])
+        value_root_b = root_objective_function(duplicated_roots[i][1])
         if dim == 1:
-            if value_root_a>value_root_b:
+            if value_root_a<value_root_b:
                 duplicated_root = duplicated_roots[i][1]
             else:
                 duplicated_root = duplicated_roots[i][0]
         else:
-            if value_root_a>value_root_b:
+            if value_root_a<value_root_b:
                 duplicated_root = list(duplicated_roots[i][1])
             else:
                 duplicated_root = list(duplicated_roots[i][0])
