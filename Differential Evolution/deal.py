@@ -120,7 +120,8 @@ def mutate(population, mutation_factor):
 def mutation_penalty(x_i, 
                      population, 
                      boundaries, 
-                     mutation_factor):
+                     mutation_factor,
+                     x_i_id = None):
     """
     INPUT:
         x_i: np.ndarray= target x_i
@@ -135,8 +136,11 @@ def mutation_penalty(x_i,
     """Generate three distinct individuals xr1, xr1, xr1 from the current population randomly"""
     population_copy = population.copy()
     pop_ids = np.arange(population_copy.shape[0])
-    indices_to_delete = np.where(np.all(population_copy == x_i, axis=1))[0] # Ensure that x_i is excluded from the selected subpopulation
-    pop_ids_no_i = np.delete(pop_ids, indices_to_delete, axis=0)
+    if x_i_id != None:
+        index_to_delete = x_i_id
+    else:
+        index_to_delete = np.where(np.all(population_copy == x_i, axis=1))[0] # Ensure that x_i is excluded from the selected subpopulation
+    pop_ids_no_i = np.delete(pop_ids, index_to_delete, axis=0)
     population_copy = population_copy[pop_ids_no_i]
 
     """Mutation form the donor/mutation vector"""
@@ -162,6 +166,7 @@ def reproduction(population,
 
         """MUTATION: Form the donor/mutation vector"""
         dv_i = mutation_penalty(x_i=x_i,
+                                x_i_id=i,
                                 population=population,
                                 boundaries=boundaries,
                                 mutation_factor=mutation_factor)
@@ -241,6 +246,7 @@ def differensial_evolution(objective_func,
         for i in range (population_size):
             x_i = population[i]
             dv_i = mutation_penalty(x_i=x_i,
+                                    x_i_id=i,
                                     population=population,
                                     boundaries=boundaries,
                                     mutation_factor=mutation_factor)
