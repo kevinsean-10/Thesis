@@ -38,12 +38,6 @@ def generate_points(dim: int,
 
     return scaled_points
 
-# def initialize_population(pop_size, dimensions, bounds):
-#     population = np.random.rand(pop_size, dimensions)
-#     lower_bounds, upper_bounds = np.asarray(bounds).T
-#     diff = np.fabs(lower_bounds - upper_bounds)
-#     return lower_bounds + population * diff
-
 """Roullete wheel selection"""
 def selection(population: np.ndarray,
               fitness: np.ndarray):
@@ -61,7 +55,7 @@ def crossover(parent1, parent2):
     crossover_point = np.random.randint(1, dimension)
     offspring1 = np.append(parent1[:crossover_point], parent2[crossover_point:])
     offspring2 = np.append(parent2[:crossover_point], parent1[crossover_point:])
-    return offspring1, offspring2
+    return [offspring1, offspring2]
 
 """One point mutation"""
 def mutate(individual,mutation_rate, boundaries):
@@ -106,10 +100,11 @@ def GA(objective_function,
                                              boundaries=boundaries)
         population = offspring_population
         fitness = np.asarray([objective_function(ind) for ind in population])
+        best_idx = np.argmin(fitness)
+        best_individual = population[best_idx]
+        best_fitness = fitness[best_idx]
         if print_stat == True:
-            best_idx = np.argmin(fitness)
-            best_individual = population[best_idx]
-            best_fitness = fitness[best_idx]
+
             print(f"=========Generation {generation}=========")
             print(f"Best Individual: {best_individual}")
             print(f"Best Score: {best_fitness}\n")
