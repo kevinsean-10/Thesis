@@ -1,23 +1,13 @@
-from random import choices, randint, randrange, random
-from typing import List, Optional, Callable, Tuple
 import numpy as np
-import pandas as pd
-import sobol_seq
-import matplotlib.pyplot as plt
 from functools import partial
-
-Genome = List[int]
-Population = List[Genome]
-FitnessFunc = Callable[[Genome], float]
-PopulateFunc = Callable[[], Population]
-SelectionFunc = Callable[[Population, FitnessFunc], Tuple[Genome, Genome]]
-CrossoverFunc = Callable[[Genome, Genome], Tuple[Genome, Genome]]
-MutationFunc = Callable[[Genome], Genome]
-PrinterFunc = Callable[[Population, int, FitnessFunc], None]
-
+import sobol_seq
 
 """GENERATE POINTS USING SOBOL SEQUENCE"""
-def generate_points(dim,npoint,low=-10,high=10):
+def generate_points(dim: int,
+                    npoint:int,
+                    low=-10,
+                    high=10,
+                    sobol = True):
     if type(low) != type(high):
         raise TypeError('The type of "low" and "high" should be the same.')
     if type(low) == int:
@@ -28,217 +18,102 @@ def generate_points(dim,npoint,low=-10,high=10):
         else:
             boundaries = [(low[i],high[i]) for i in range (len(low))]
 
-    # Generate Sobol sequence points
-    sobol_points = sobol_seq.i4_sobol_generate(dim, npoint)
-
-    # Scale the Sobol points to fit within the specified boundaries
-    scaled_points = []
-    for i in range(dim):
-        a, b = boundaries[i]
-        scaled_dim = a + sobol_points[:, i] * (b - a)
-        scaled_points.append(scaled_dim)
-
-    # Transpose the scaled points to get points per dimension
-    scaled_points = np.array(list(map(list, zip(*scaled_points))))
-    return scaled_points 
-
-def encode_number(number, min_value=-10, max_value=10, num_bits=32):
-    # Normalize the number to a value between 0 and 1
-    normalized = (number - min_value) / (max_value - min_value)
-    # Convert it to an integer representation
-    int_representation = int(normalized * (2**num_bits - 1))
-    # Convert the integer to binary and pad with zeros
-    return [int(x) for x in format(int_representation, '0{}b'.format(num_bits))]
-
-def decode_number(genome:Genome, min_value=-10, max_value=10, num_bits=32):
-    # Convert the binary string to an integer
-    int_representation = int(''.join(map(str, genome)), 2)
-    # Scale down to the normalized value
-    normalized = int_representation / (2**num_bits - 1)
-    # Denormalize to get the real number
-    return min_value + normalized * (max_value - min_value)
-
-def encode_list(number_list,min_value=-10, max_value=10, num_bits=32):
-    encoded = []
-    for number in number_list:
-        encoded += encode_number(number,min_value, max_value, num_bits)
-    return encoded
-
-def decode_list(encoded_list,min_value=-10, max_value=10, num_bits=32):
-    numbers = []
-    for i in range(0, len(encoded_list), num_bits):
-        binary_list = encoded_list[i:i + num_bits]
-        number = decode_number(binary_list, min_value, max_value, num_bits)
-        numbers.append(number)
-    return numbers
-
-def generate_population(set_of_points:np.ndarray,min_value=-10, max_value=10, num_bits=32) -> Population:
-    return [encode_list(set_of_points[point],min_value, max_value, num_bits) for point in range(len(set_of_points))]
-
-def single_point_crossover(a: Genome, b: Genome, print_cutoff=False) -> Tuple[Genome, Genome]:
-    if len(a) != len(b):
-        raise ValueError("Genomes a and b must be of same length")
-    length = len(a)
-    # if the length less than 2, then there is no point to do the function
-    if length < 2:  
-        return a, b
-    # generate random number as the cutoff of the crossover
-    p = randint(1, length - 1)
-    if print_cutoff == True:
-        print(p)
+    if sobol == True:
+        # Generate Sobol sequence points
+        sobol_points = sobol_seq.i4_sobol_generate(dim, npoint)
+        # Scale the Sobol points to fit within the specified boundaries
+        scaled_points = []
+        for i in range(dim):
+            a, b = boundaries[i]
+            scaled_dim = a + sobol_points[:, i] * (b - a)
+            scaled_points.append(scaled_dim)
+        # Transpose the scaled points to get points per dimension
+        scaled_points = np.array(list(map(list, zip(*scaled_points))))
     
-    return a[0:p] + b[p:], b[0:p] + a[p:]
-
-def mutation(genome: Genome, num: int = 1, probability: float = 0.5) -> Genome:
-    # num: generate how many chromosome(s) that we want to mutate
-    for _ in range(num):
-        # index sets which chromosome we want to change
-        index = randrange(len(genome))
-        # the change algorithm
-        genome[index] = genome[index] if random() > probability else abs(genome[index] - 1)
-    return genome
-
-def fitness_function(genome: Genome,objective_function, min_value=-10, max_value=10, num_bits=64) -> float:
-    X = decode_list(genome, min_value, max_value, num_bits)
-    return objective_function(X)
-
-# for convenience, call fitness function from these functions below using partial(...)
-def population_fitness(population: Population, fitness_func: FitnessFunc) -> float:
-    return sum([fitness_func(genome) for genome in population])
-
-def selection_pair(population: Population,population_fitness_func, fitness_func: FitnessFunc) -> Population:
-    total_sum = population_fitness_func(population,fitness_func)
-    return choices(
-        population=population,
-        weights=[(total_sum-fitness_func(gene))/total_sum for gene in population],
-        k=2
-    )
-def sort_population(population: Population, fitness_func: FitnessFunc) -> Population:
-    return sorted(population,key= lambda x: fitness_func(x), reverse=False)
-
-def genome_to_string(genome: Genome) -> str:
-    return "".join(map(str, genome))
-
-def print_stats(population: Population, generation_id: int, fitness_func: FitnessFunc, decode_list_func,binary_mode=False):
-    print("GENERATION %02d" % generation_id)
-    print("=============")
-    if binary_mode == True:
-        print("Population: [%s]" % ", ".join([genome_to_string(gene) for gene in population]))
-        print("Avg. Fitness: %f" % (population_fitness(population, fitness_func) / len(population)))
-        print("Worst solution: %s (%f)" % (genome_to_string(population[-1]),
-                                fitness_func(population[-1])))
-        print(
-            "Best solution: %s (%f)" % (genome_to_string(population[0]), fitness_func(population[0])))
-        print("")
     else:
-        # print(f"Population: {[decode_list_func(population[i]) for i in range (len(population))]}")
-        # print("Avg. Fitness: %f" % (population_fitness(population, fitness_func) / len(population)))
-        print(f"Worst solution: {(decode_list_func(population[-1]))} with value {fitness_func(population[-1])}")
-        print(f"Best solution: {(decode_list_func(population[0]))} with value {fitness_func(population[0])}")
-        print("")
-    # return sorted_population[0]
+        scaled_points = np.zeros((npoint, dim))
+        for i in range(dim):
+            min_val, max_val = boundaries[i]
+            scaled_points[:, i] = np.random.uniform(min_val, max_val, npoint)
 
-def run_evolution(
-        populate_func,
-        fitness_func,
-        fitness_limit: int,
-        selection_func: SelectionFunc = selection_pair,
-        crossover_func: CrossoverFunc = single_point_crossover,
-        mutation_func: MutationFunc = mutation,
-        sort_func = sort_population,
-        generation_limit: int = 100,
-        seed: int = 0,
-        printer: Optional[PrinterFunc] = None) \
-        -> Tuple[Population, int]:
+    return scaled_points
+
+# def initialize_population(pop_size, dimensions, bounds):
+#     population = np.random.rand(pop_size, dimensions)
+#     lower_bounds, upper_bounds = np.asarray(bounds).T
+#     diff = np.fabs(lower_bounds - upper_bounds)
+#     return lower_bounds + population * diff
+
+"""Roullete wheel selection"""
+def selection(population: np.ndarray,
+              fitness: np.ndarray):
+    population_size = population.shape[0]
+    selection_probs = np.array([1 / (fit + 1) for fit in fitness]) # add one to avoid negative probability
+    total_probs = sum(selection_probs)
+    selection_probs = np.array([prob / total_probs for prob in selection_probs])
+    selected_indices = np.random.choice(a=np.arange(population_size),size=population_size,p=selection_probs)
+    selected_population = np.array([population[i] for i in selected_indices])
+    return selected_population
+
+"""Single point crossover"""
+def crossover(parent1, parent2):
+    dimension = len(parent1)
+    crossover_point = np.random.randint(1, dimension)
+    offspring1 = np.append(parent1[:crossover_point], parent2[crossover_point:])
+    offspring2 = np.append(parent2[:crossover_point], parent1[crossover_point:])
+    return offspring1, offspring2
+
+"""One point mutation"""
+def mutate(individual,mutation_rate, boundaries):
+    for j in range(len(individual)):
+        if np.random.random() < mutation_rate:
+            individual[j] = np.random.uniform(boundaries[j][0], boundaries[j][1])
+    return individual
+
+
+def recombination(population: np.ndarray,mutation_rate, boundaries):
+    offspring_population = []
+    population_size = population.shape[0]
+    for i in range(0, population_size, 2):
+        parent1 = population[i]
+        parent2 = population[i + 1]
+        offspring1, offspring2 = crossover(parent1=parent1,parent2=parent2)
+        offspring1 = mutate(individual=offspring1,mutation_rate=mutation_rate, boundaries=boundaries)
+        offspring2 = mutate(individual=offspring2,mutation_rate=mutation_rate, boundaries=boundaries)
+        offspring_population.extend([offspring1, offspring2])
+    offspring_population = np.array(offspring_population)
+    return offspring_population
+
+def GA(objective_function,
+       population_size,
+       boundaries,
+       max_generation,
+       mutation_rate,
+       seed=0,
+       print_stat = False):
+    
     np.random.seed(seed)
-    population = populate_func()
+    dim = boundaries.shape[1]
+    population = generate_points(dim=dim,npoint=population_size,low=boundaries[:,0],high=boundaries[:,1],sobol=True)
+    fitness = np.asarray([objective_function(ind) for ind in population])
+    best_idx = np.argmin(fitness)
+    best_individual = population[best_idx]
 
-    for i in range(generation_limit):
-        # print(f"i={i}")
-        population = sort_func(population)
+    for generation in range(max_generation):
+        selected_population = selection(population=population,fitness=fitness)
+        offspring_population = recombination(population=selected_population,
+                                             mutation_rate=mutation_rate,
+                                             boundaries=boundaries)
+        population = offspring_population
+        fitness = np.asarray([objective_function(ind) for ind in population])
+        if print_stat == True:
+            best_idx = np.argmin(fitness)
+            best_individual = population[best_idx]
+            best_fitness = fitness[best_idx]
+            print(f"=========Generation {generation}=========")
+            print(f"Best Individual: {best_individual}")
+            print(f"Best Score: {best_fitness}\n")
 
-        if printer is not None:
-            printer(population, i)
 
-        cutoff_criteria = fitness_func(population[0])
-        # print(f"cutoff:{cutoff_criteria}\n")
-        # print(decode_list(population[0],min_value=min_value,max_value=max_value,num_bits=64))
-        if cutoff_criteria < fitness_limit:
-            break
+    return best_individual, best_fitness
 
-        next_generation = population[0:2]
-
-        for j in range(int(len(population) / 2) - 1):
-            parents = selection_func(population)
-            # print(f"j={j}")
-            # print(decode_list(parents[0],min_value=min_value,max_value=max_value,num_bits=64),decode_list(parents[1],min_value=min_value,max_value=max_value,num_bits=64))
-            offspring_a, offspring_b = crossover_func(parents[0], parents[1])
-            offspring_a = mutation_func(offspring_a)
-            offspring_b = mutation_func(offspring_b)
-            next_generation += [offspring_a, offspring_b]
-
-        population = next_generation
-
-    return population, i
-
-from random import choices, randint, randrange, random,seed
-from typing import List, Optional, Callable, Tuple
-import numpy as np
-import pandas as pd
-import sobol_seq
-import matplotlib.pyplot as plt
-from functools import partial
-
-n_point = 100
-k_max = 100
-dim = 2
-epsilon = 10**(-5)
-p_mutation = 0.1
-num_bits = 64  # Number of bits for each number
-
-def objective_function(x):
-    F = (x[0]-3)**2 + (x[1]-2)**2
-    return F
-
-boundaries = np.array([(-10,10) for _ in range (dim)])
-
-min_value = boundaries.min()
-max_value = boundaries.max()
-
-iter_points = generate_points(dim,n_point,boundaries[:,0],boundaries[:,1])
-
-population,generation = run_evolution(
-    populate_func=partial(
-        generate_population,set_of_points = iter_points,num_bits=num_bits,min_value=min_value,max_value=max_value
-    ),
-    fitness_func= partial(
-        fitness_function,objective_function=objective_function, num_bits=num_bits,min_value=min_value,max_value=max_value
-    ),
-    sort_func=partial(
-        sort_population,
-        fitness_func=partial(
-            fitness_function,
-            objective_function=objective_function,
-            num_bits=num_bits,
-            min_value=min_value,max_value=max_value   
-        )),
-    selection_func=partial(
-        selection_pair,
-        population_fitness_func=population_fitness,
-        fitness_func=partial(
-            fitness_function,
-            objective_function=objective_function,
-            num_bits=num_bits,
-            min_value=min_value,max_value=max_value)),
-    mutation_func=partial(
-        mutation,probability=p_mutation
-    ),
-    fitness_limit=epsilon,
-    generation_limit=k_max,
-    printer=partial(print_stats,fitness_func=partial(
-        fitness_function,objective_function=objective_function,max_value=max_value,min_value=min_value,num_bits=num_bits
-        ),decode_list_func=partial(
-            decode_list,min_value=min_value,max_value=max_value,num_bits=num_bits)
-        ),
-    seed=10
-)

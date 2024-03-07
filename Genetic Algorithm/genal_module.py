@@ -113,54 +113,38 @@ def root_GenAl(objective_function:ObjectiveFunctionType,
                            seed=seed)
         roots.append(root)
         values.append(value)
-    roots = np.array(roots)
+    archive = np.array(roots)
     values = np.array(values)
     if print_cluster==True:
         print(f'Number of Clusters containing root: {cluster.shape[0]}\n')
-        print(f'Roots:\n{roots}\n\nValues: \n{values}')
+        print(f'Roots:\n{archive}\n\nValues: \n{values}')
 
     """Choosing Best Solution"""
     if dim == 1:
-        list_criteria = [element for sublist in roots for element in sublist] #convert from 2D array into 1D array
+        list_criteria = [element for sublist in archive for element in sublist] #convert from 2D array into 1D array
     else:
-        list_criteria = roots
-    eligible_roots = np.array([x for x in list_criteria if root_objective_function(x)<epsilon])
-    duplicated_roots = []
+        list_criteria = archive
+    eligible_roots = np.array([x for x in list_criteria if (root_objective_function(x))<-1+epsilon])
+    id_duplicated_roots = []
     for i in range(len(eligible_roots)):
         for j in range (i+1,len(eligible_roots)):
             if np.linalg.norm(eligible_roots[i]-eligible_roots[j])<delta:
-                duplicated_roots.append([eligible_roots[i],eligible_roots[j]])
-    duplicated_roots = np.unique(duplicated_roots,axis=0)
-
-    deselected_duplicated_roots = []
-    for i in range (len(duplicated_roots)):
-        value_root_a = root_objective_function(duplicated_roots[i][0])
-        value_root_b = root_objective_function(duplicated_roots[i][1])
-        if dim == 1:
-            if value_root_a<value_root_b:
-                duplicated_root = duplicated_roots[i][1]
-            else:
-                duplicated_root = duplicated_roots[i][0]
+                id_duplicated_roots.append([i,j])
+    id_duplicated_roots = np.unique(id_duplicated_roots,axis=0)
+    deselected_id_duplicated_roots = []
+    for i in range (len(id_duplicated_roots)):
+        root_a = root_objective_function(eligible_roots[id_duplicated_roots[i][0]])
+        root_b = root_objective_function(eligible_roots[id_duplicated_roots[i][1]])
+        if root_a<=root_b:
+            id_duplicated_root = id_duplicated_roots[i][1]
         else:
-            if value_root_a<value_root_b:
-                duplicated_root = list(duplicated_roots[i][1])
-            else:
-                duplicated_root = list(duplicated_roots[i][0])
-        deselected_duplicated_roots.append(duplicated_root)
+            id_duplicated_root = id_duplicated_roots[i][0]
+        deselected_id_duplicated_roots.append(id_duplicated_root)
 
-    if dim == 1:
-        # Reshape the 1D array to have one column
-        deselected_duplicated_roots = np.array(deselected_duplicated_roots).reshape(-1, 1)
-
-        # Compare the 2D array with the reshaped 1D array
-        exclude_condition = np.all(eligible_roots != deselected_duplicated_roots, axis=0)
-
-        # Use the boolean mask to filter eligible_roots
-        final_root = eligible_roots[exclude_condition]
+    if deselected_id_duplicated_roots:
+        unique_roots = np.ones(len(eligible_roots),dtype=bool)
+        unique_roots[deselected_id_duplicated_roots] = False
+        final_root = eligible_roots[unique_roots]
     else:
-        if deselected_duplicated_roots:
-            exclude_condition = np.all(eligible_roots != np.array(deselected_duplicated_roots)[:, np.newaxis], axis=2).all(axis=0)
-            final_root = eligible_roots[exclude_condition]
-        else:
-            final_root = eligible_roots
+        final_root = eligible_roots
     return final_root
