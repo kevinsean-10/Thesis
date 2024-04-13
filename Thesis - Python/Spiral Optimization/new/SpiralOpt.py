@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import sobol_seq
 from scipy.stats import qmc
 
 class Spiral_Optimization:
