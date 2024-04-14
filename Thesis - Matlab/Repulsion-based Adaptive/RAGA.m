@@ -1,4 +1,4 @@
-classdef RADE < handle
+classdef RAGA < handle
     properties
         boundaries
         dim
@@ -18,7 +18,10 @@ classdef RADE < handle
     end
     
     methods
-        function obj = RADE(boundaries,population_size,num_per_subpopulation,max_generation,max_archive_size,theta,tau_d,F_init,CR_init,max_memories_size,beta,rho,seed)
+        function obj = RAGA(boundaries,population_size, ...
+                num_per_subpopulation,max_generation, ...
+                max_archive_size,theta,tau_d,F_init,CR_init, ...
+                max_memories_size,beta,rho,seed)
             obj.boundaries = boundaries;
             obj.dim = size(obj.boundaries,1);
             obj.population_size = population_size;
@@ -35,7 +38,7 @@ classdef RADE < handle
             obj.archive = [];
             obj.seed = seed;
         end
-
+        
         function F_array = system_equations(obj,x)
             f1 = exp(x(1)-x(2)) - sin(x(1)+x(2));
             f2 = (x(1)*x(2))^2 - cos(x(1)+x(2));
@@ -98,55 +101,52 @@ classdef RADE < handle
             end
         end
 
-        function mutant = mutate(obj, population, F)
-            % Mutation function for DE
-            % Vectorized mutation operation
-            [~, indices] = sort(randperm(size(population, 1)));
-            r = population(indices(1:3), :);
-            mutant = r(1, :) + F * (r(2, :) - r(3, :));
+        function [selected_population,selected_indices] = selection(obj, population, fitness)
+            pop_size = size(population, 1);
+            selection_probs = 1 ./ (fitness + 1); % add one to avoid division by zero
+            total_probs = sum(selection_probs);
+            selection_probs = selection_probs / total_probs;
+            selected_indices = randsample(1:pop_size, pop_size, true, selection_probs);
+            selected_population = population(selected_indices, :);
         end
 
-        function trial = crossover(obj, target, mutant, CR)
-            % Crossover function for DE
-            cross_points = rand(size(target)) < CR;
-            % Ensure at least one true crossover point
-            if ~any(cross_points(:))
-                cross_points(randi(size(target, 2))) = true;
-            end
-            trial = mutant;
-            trial(cross_points) = target(cross_points);
+        function offspring_set = crossover(obj, parent1, parent2)
+            dimension = length(parent1);
+            crossover_point = randi([1, dimension], 1);
+            offspring1 = [parent1(1:crossover_point), parent2(crossover_point+1:end)];
+            offspring2 = [parent2(1:crossover_point), parent1(crossover_point+1:end)];
+            offspring_set = [offspring1; offspring2];
         end
 
-        function dv_i = mutation_penalty(obj, x_i, subpop_i, boundaries, scaling_factor)
-            % Mutation function with penalty for DE
-            % Inputs:
-            % x_i: target x_i
-            % subpop_i: number of individuals closest to x_i
-            % boundaries: boundaries/constraints of the function
-            % scaling_factor: scaling factor of the function
-            % Output:
-            % dv_i: donor vector that has been mutated and penalized.
-        
-            % Generate three distinct individuals xr1, xr1, xr1 from the current population randomly
-            pop_ids = 1:size(subpop_i, 1);
-            indices_to_delete = find(all(subpop_i == x_i, 2)); % Ensure that x_i is excluded from the selected subpopulation
-            subpop_ids_no_i = setdiff(pop_ids, indices_to_delete);
-            subpop_i = subpop_i(subpop_ids_no_i, :);
-        
-            % Mutation form the donor/mutation vector
-            dv_i = obj.mutate(subpop_i, scaling_factor);
-        
-            % Set penalty for every donor vector that violates the boundaries
-            for j = 1:size(dv_i, 2)
-                if dv_i(j) < boundaries(j, 1)
-                    dv_i(j) = (x_i(j) + boundaries(j, 1)) / 2;
-                elseif dv_i(j) > boundaries(j, 2)
-                    dv_i(j) = (x_i(j) + boundaries(j, 2)) / 2;
+        function individual = mutate(obj, individual, mutation_rate, boundaries)
+            for j = 1:length(individual)
+                if rand() < mutation_rate
+                    individual(j) = rand() * (boundaries(j, 2) - boundaries(j, 1)) + boundaries(j, 1);
                 end
             end
         end
 
-        function subpop = subpopulating(obj, individual, population, t)
+        function offspring_population = recombination(obj, population, mutation_rate, boundaries)
+            offspring_population = [];
+            pop_size = size(population, 1);
+            for i = 1:2:pop_size
+                parent1 = population(i, :);
+                parent2 = population(i + 1, :);
+                [offspring1, offspring2] = obj.crossover(parent1, parent2);
+                offspring1 = obj.mutate(offspring1, mutation_rate, boundaries);
+                offspring2 = obj.mutate(offspring2, mutation_rate, boundaries);
+                offspring_population = [offspring_population; offspring1; offspring2];
+            end
+        end
+
+        function [id_min_dist, closest_point] = closest_solution(obj,initial_point, set_of_points)
+            diff = set_of_points - initial_point;
+            distances = vecnorm(diff, 2, 2);
+            [~, id_min_dist] = min(distances);
+            closest_point = set_of_points(id_min_dist,:);
+        end
+
+        function subpopulation = subpopulating(obj, individual, population, t)
             % Calculate Euclidean distances and select t closest individuals.
             % Inputs:
             % individual: individual target
@@ -166,7 +166,7 @@ classdef RADE < handle
             closest_indices = sorted_indices(1:t);
         
             % Form the subpopulation with the closest individuals
-            subpop = population(closest_indices, :);
+            subpopulation = population(closest_indices, :);
         end
 
         function archive = update_archive(obj, x)
@@ -176,7 +176,7 @@ classdef RADE < handle
             % Outputs:
             % archive: updated archive
         
-            f_x = obj.objective_function(x)
+            f_x = obj.objective_function(x);
             s = size(obj.archive,1); % current archive size
 
             if f_x < obj.theta % x is a root
@@ -211,7 +211,7 @@ classdef RADE < handle
         
             archive = obj.archive;
         end
-        
+
         function [Fi, CRi] = update_parameter(obj)
             % OUTPUT
             % Fi: scaling factor
@@ -220,7 +220,7 @@ classdef RADE < handle
             % Randomly select an index
             hi = randi(obj.max_memories_size);
             % Generate Fi using the Cauchy distribution with the location parameter MF(hi) and scale 0.1
-%             Fi = tan(pi * (rand - 0.5)) + obj.memories_F(hi)
+            % Fi = tan(pi * (rand - 0.5)) + obj.memories_F(hi)
             Fi = obj.memories_F(hi) + 0.1*trnd(1,1);
             % Generate CRi using the Gaussian distribution with mean MCR(hi) and standard deviation 0.1
             CRi = normrnd(obj.memories_CR(hi), 0.1);
@@ -245,9 +245,9 @@ classdef RADE < handle
             denominator = sum(elements .* weights);
             if denominator == 0
                 result = 0;
+            else
+                result = numerator / denominator;
             end
-            result = numerator / denominator;
-
         end
 
         function result = meanWA(obj, elements, weights)
@@ -266,6 +266,74 @@ classdef RADE < handle
             end
         end
 
+        function DE_evaluation(obj,verbose)
+            rng(obj.seed);
+            population = obj.generate_points(obj.population_size,obj.boundaries,obj.seed);
+            
+            fitness = zeros(1, obj.population_size);
+            for i = 1:obj.population_size
+                fitness(i) = obj.objective_function(population(i, :));
+            end
+            [best_fitness, best_idx] = min(fitness);
+            best = population(best_idx, :);
+            subpopulation = zeros(obj.num_per_subpopulation,obj.dim,obj.population_size);
+            for i = 1:obj.population_size
+                subpopulation(:, :, i) = obj.subpopulating(population(i, :), population, obj.num_per_subpopulation);
+            end
+            
+            memory_id=1;
+            
+            for gen = 1:obj.max_generation 
+                S_F = [];
+                S_CR = [];
+                for i = 1:2:obj.population_size
+                    [F_i, CR_i] = obj.update_parameter();
+                    x_i = population(i, :);
+                    parent = zeros(2, obj.dim); % because of one-point crossover
+                
+                    for j = 0:size(parent, 1)-1
+                        fitness_subpopulation = zeros(1,size(subpopulation,1));
+                        for k = 1:size(subpopulation,1)
+                            fitness_subpopulation(k) = obj.objective_function(subpopulation(k,:,i+j));
+                        end
+                        [selected_subpopulation,selected_indices] = obj.selection(subpopulation(:,:,i+j),fitness_subpopulation);
+                        [~,min_idx_parent] = min(fitness_subpopulation(selected_indices));
+                        parent(j+1,:) = selected_subpopulation(min_idx_parent,:);
+                    end
+                    offspring_set = obj.crossover(parent(1,:),parent(2,:));
+                    
+                    for k=1:size(offspring_set,1)
+                        trial = obj.mutate(offspring_set(k,:),F_i,obj.boundaries);
+                        trial_fitness = obj.fitness_function(trial);
+                        [id_closest_trial,closest_trial] = obj.closest_solution(trial,population);
+                        closest_trial_fitness = obj.fitness_function(closest_trial);
+                        if trial_fitness < closest_trial_fitness
+                            fitness(id_closest_trial) = trial_fitness;
+                            population(id_closest_trial,:) = trial;
+                            obj.archive = obj.update_archive(trial);
+                            S_F = [S_F, F_i];
+                            S_CR = [S_CR, CR_i];
+                            if trial_fitness < best_fitness
+                                best_idx = i;
+                                best = trial;
+                            end
+                        end
+                    end
+                end
+                if verbose
+                    fprintf("=========Generation %d=========\n", gen);
+                    disp("Archive:");
+                    disp(obj.archive);
+                end
+                if ~isempty(S_F) && ~isempty(S_CR)
+                    obj.update_history(S_F, S_CR, memory_id);
+                    memory_id = memory_id + 1;
+                    if memory_id > obj.max_memories_size
+                        memory_id = 1;
+                    end
+                end
+            end
+        end
 
     end
 end
