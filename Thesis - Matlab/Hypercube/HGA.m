@@ -186,7 +186,7 @@ classdef HGA < handle
         function final_root = root_elimination(obj,root_archive)
             eligible_roots = [];
             for i = 1:size(root_archive,1)
-                if obj.objective_function(root_archive(i,:)) < -1 + obj.epsilon  *1e4
+                if obj.objective_function(root_archive(i,:)) < -1 + obj.epsilon
                     eligible_roots = [eligible_roots; root_archive(i,:)];
                 end
             end
@@ -230,7 +230,7 @@ classdef HGA < handle
                     subbound(d, :) = [min(obj.cluster(:, d, i)), max(obj.cluster(:, d, i))];
                 end
         
-                [root, root_score] = obj.GA(obj.population_size,obj.boundaries,obj.max_generation,obj.mutation_rate,obj.seed,superverbose);
+                [root, root_score] = obj.GA(obj.population_size,subbound,obj.max_generation,obj.mutation_rate,obj.seed,superverbose);
                 
                 obj.archive{end+1} = root;
                 obj.score(end+1) = root_score;

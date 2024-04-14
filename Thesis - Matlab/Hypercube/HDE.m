@@ -1,9 +1,11 @@
-classdef HGA < handle
+classdef HDE < handle   
     properties
         boundaries
         dim
         population_size
         max_generation
+        mutation_factor
+        crossover_rate
         delta
         epsilon
         parts
@@ -11,24 +13,25 @@ classdef HGA < handle
         cluster
         archive
         score
-        final_root
     end
+    
     methods
-        function obj = HGA(boundaries, population_size, parts, max_generation,epsilon, delta, seed)
+        function obj = HDE(boundaries, population_size, parts, max_generation,mutation_factor, crossover_rate,epsilon, delta, seed)
             obj.boundaries = boundaries;
             obj.dim = size(boundaries,1);
             obj.population_size = population_size;
             obj.max_generation = max_generation;
             obj.parts = parts;
+            obj.mutation_factor = mutation_factor;
+            obj.crossover_rate = crossover_rate;
             obj.epsilon = epsilon;
             obj.delta = delta;
             obj.seed = seed;
             obj.cluster = {};
             obj.archive = {};
             obj.score = [];
-            obj = GA_evaluation(obj);
         end
-
+        
         function F_array = system_equations(obj,x)
             f1 = exp(x(1)-x(2)) - sin(x(1)+x(2));
             f2 = (x(1)*x(2))^2 - cos(x(1)+x(2));
@@ -40,7 +43,7 @@ classdef HGA < handle
             res = sum(abs(F_array));
             res = -1 / (1 + res);
         end
-        
+
         function points = generate_points(obj,npoint,boundaries,seed)
             rng(seed)
             dimension = size(boundaries,1);
@@ -53,71 +56,92 @@ classdef HGA < handle
             end
         end
 
-        function selected_population = selection(obj, population, fitness)
-            pop_size = size(population, 1);
-            selection_probs = 1 ./ (fitness + 1); % add one to avoid division by zero
-            total_probs = sum(selection_probs);
-            selection_probs = selection_probs / total_probs;
-            selected_indices = randsample(1:pop_size, pop_size, true, selection_probs);
-            selected_population = population(selected_indices, :);
+        function mutant = mutate(obj, population, F)
+            % Mutation function for DE
+            % Vectorized mutation operation
+            [~, indices] = sort(randperm(size(population, 1)));
+            r = population(indices(1:3), :);
+            mutant = r(1, :) + F * (r(2, :) - r(3, :));
         end
 
-        function [offspring1, offspring2] = crossover(obj, parent1, parent2)
-            dimension = length(parent1);
-            crossover_point = randi([1, dimension], 1);
-            offspring1 = [parent1(1:crossover_point), parent2(crossover_point+1:end)];
-            offspring2 = [parent2(1:crossover_point), parent1(crossover_point+1:end)];
+        function trial = crossover(obj, target, mutant, CR)
+            % Crossover function for DE
+            cross_points = rand(size(target)) < CR;
+            % Ensure at least one true crossover point
+            if ~any(cross_points(:))
+                cross_points(randi(size(target, 2))) = true;
+            end
+            trial = mutant;
+            trial(cross_points) = target(cross_points);
         end
 
-        function individual = mutate(obj, individual, mutation_rate, boundaries)
-            for j = 1:length(individual)
-                if rand() < mutation_rate
-                    individual(j) = rand() * (boundaries(j, 2) - boundaries(j, 1)) + boundaries(j, 1);
+        function dv_i = mutation_penalty(obj, x_i, population, boundaries, mutation_factor,x_i_id)
+            % Mutation function with penalty for DE
+            % Inputs:
+            % x_i: target x_i
+            % subpop_i: number of individuals closest to x_i
+            % boundaries: boundaries/constraints of the function
+            % scaling_factor: scaling factor of the function
+            % Output:
+            % dv_i: donor vector that has been mutated and penalized.
+        
+            % Generate three distinct individuals xr1, xr1, xr1 from 
+            % the current population randomly
+            population_copy = population;
+            pop_ids = 1:size(population_copy, 1);
+            if nargin > 4 && ~isempty(x_i_id)
+                index_to_delete = x_i_id;
+            else
+                index_to_delete = find(all(population_copy == x_i, 2)); 
+                % Ensure that x_i is excluded from the selected subpopulation
+            end
+            pop_ids_no_i = setdiff(pop_ids, index_to_delete);
+            population_copy = population_copy(pop_ids_no_i, :);
+        
+            % Mutation form the donor/mutation vector
+            dv_i = obj.mutate(population_copy, mutation_factor);
+        
+            % Set penalty for every donor vector that violates the boundaries
+            for j = 1:size(dv_i, 2)
+                if dv_i(j) < boundaries(j, 1)
+                    dv_i(j) = (x_i(j) + boundaries(j, 1)) / 2;
+                elseif dv_i(j) > boundaries(j, 2)
+                    dv_i(j) = (x_i(j) + boundaries(j, 2)) / 2;
                 end
             end
         end
 
-        function offspring_population = recombination(obj, population, mutation_rate, boundaries)
-            offspring_population = [];
-            pop_size = size(population, 1);
-            for i = 1:2:pop_size
-                parent1 = population(i, :);
-                parent2 = population(i + 1, :);
-                [offspring1, offspring2] = obj.crossover(parent1, parent2);
-                offspring1 = obj.mutate(offspring1, mutation_rate, boundaries);
-                offspring2 = obj.mutate(offspring2, mutation_rate, boundaries);
-                offspring_population = [offspring_population; offspring1; offspring2];
-            end
-        end
-
-        function [best_individual, best_fitness] = GA(obj, population_size, boundaries, max_generation, mutation_rate, seed, print_stat)
-            rng(seed);
-            dimension = size(boundaries, 2);
+        function [best_point, best_score] = DE(obj, boundaries,population_size,max_generation,mutation_factor,crossover_rate,seed,print_stat)
+            rng(seed); % Set random seed
             population = obj.generate_points(population_size, boundaries, seed);
             fitness = zeros(1, population_size);
             for i = 1:population_size
                 fitness(i) = obj.objective_function(population(i, :));
             end
-            [best_fitness, best_idx] = min(fitness);
-            best_individual = population(best_idx, :);
-        
-            for generation = 1:max_generation
-                selected_population = obj.selection(population, fitness);
-                offspring_population = obj.recombination(selected_population, mutation_rate, boundaries);
-                population = offspring_population;
-                fitness = zeros(1, population_size);
+            [best_score, best_idx] = min(fitness);
+            best_point = population(best_idx,:);
+
+            for gen = 1:max_generation
                 for i = 1:population_size
-                    fitness(i) = obj.objective_function(population(i, :));
+                    x_i = population(i,:);
+                    dv_i = obj.mutation_penalty(x_i, population, boundaries, mutation_factor,i);
+                    trial = obj.crossover(x_i, dv_i, crossover_rate);
+                    trial_fitness = obj.objective_function(trial);
+
+                    if trial_fitness <= fitness(i)
+                        fitness(i) = trial_fitness;
+                        population(i,:) = trial;
+                        if trial_fitness < fitness(best_idx)
+                            best_idx = i;
+                            best_point = trial;
+                            best_score = fitness(best_idx);
+                        end
+                    end
                 end
-                [best_fitness, best_idx] = min(fitness);
-                best_individual = population(best_idx, :);
-                if print_stat == true
-                    disp("=========Generation " + generation + "=========");
-                    disp("Best Individual: ");
-                    disp(best_individual);
-                    disp("Best Score: ");
-                    disp(best_fitness);
-                    disp(" ");
+
+                if print_stat
+                    fprintf("=========Generation %d=========\n", gen);
+                    fprintf("Best Point: %s with score %.4f\n", mat2str(best_point), best_score);
                 end
             end
         end
@@ -186,11 +210,10 @@ classdef HGA < handle
         function final_root = root_elimination(obj,root_archive)
             eligible_roots = [];
             for i = 1:size(root_archive,1)
-                if obj.objective_function(root_archive(i,:)) < -1 + obj.epsilon  *1e4
-                    eligible_roots = [eligible_roots; root_archive(i,:)];
+                if obj.objective_function(root_archive(i,:)) < -1 + obj.epsilon
+                    eligible_roots = [eligible_roots; root_archive(i,:)]
                 end
             end
-            
             
             id_duplicated_roots = [];
             for i = 1:length(eligible_roots)
@@ -223,15 +246,15 @@ classdef HGA < handle
                 final_root = eligible_roots;
             end
         end
-        
-        function GA_evaluation(obj, verbose, superverbose)
+
+        function final_root = DE_evaluation(obj, verbose, superverbose)
             for i = 1:size(obj.cluster, 3)
                 subbound = zeros(obj.dim, 2);
                 for d = 1:size(obj.cluster, 2)
                     subbound(d, :) = [min(obj.cluster(:, d, i)), max(obj.cluster(:, d, i))];
                 end
         
-                [root, root_score] = obj.GA(obj.population_size,obj.boundaries,obj.max_generation,obj.);
+                [root, root_score] = obj.DE(subbound,obj.population_size,obj.max_generation,obj.mutation_factor,obj.crossover_rate,obj.seed,superverbose);
                 
                 obj.archive{end+1} = root;
                 obj.score(end+1) = root_score;
@@ -242,10 +265,16 @@ classdef HGA < handle
                     disp(obj.archive);
                 end
             end
-        
-            obj.final_root = root_elimination(obj, obj.archive);
-        end
 
+            % Convert cell array to matrix
+            archive_matrix = zeros(numel(obj.archive), numel(obj.archive{1}));
+            for i = 1:numel(obj.archive)
+                archive_matrix(i, :) = obj.archive{i};
+            end
+
+            final_root = root_elimination(obj, archive_matrix);
+        end
 
     end
 end
+

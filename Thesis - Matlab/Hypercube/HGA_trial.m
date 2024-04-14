@@ -1,6 +1,6 @@
 clear;clc
 
-epsilon = 1e-5;
+epsilon = 1e-6;
 delta = 0.01;
 m = 100;
 gen_max = 1000;
@@ -8,7 +8,7 @@ dim = 2;
 p_mutation = 0.1;
 seed = 'shuffle';
 print_stat = false;
-verbose = false;
+verbose = true;
 
 % how many parts/slices do you desire in each dimension? (even number only)
 parts = 100;
@@ -22,15 +22,6 @@ poi = hgaopt.generate_points(m,boundaries,seed);
 hgaopt.clustering()
 archive = hgaopt.GA_evaluation(verbose,print_stat)
 
-
-% % Convert cell array to matrix
-% archive_matrix = zeros(numel(archive), numel(archive{1}));
-% for i = 1:numel(archive)
-%     archive_matrix(i, :) = archive{i};
-% end
-% 
-% disp(archive_matrix)
-% hgaopt.root_elimination(archive_matrix)
 
 
 
