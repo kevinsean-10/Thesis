@@ -20,7 +20,7 @@ boundaries = repmat([-10, 10], dim, 1);
 % x1+10>=0; -x1+10>=0
 % x2+10>=0; -x2+10>=0
 
-spiropt = spiral_optimization(boundaries,m_cluster,k_cluster,m,k_max,epsilon,delta,gamma,theta,r,seed);
+spiropt = SD(boundaries,m_cluster,k_cluster,m,k_max,epsilon,delta,gamma,theta,r,seed);
 
 spiropt.spiral_opt_evaluation(verbose)
 

@@ -1,4 +1,4 @@
-classdef spiral_optimization < handle
+classdef SD < handle
     properties
         boundaries
         dim
@@ -18,7 +18,7 @@ classdef spiral_optimization < handle
     end
     
     methods
-        function obj = spiral_optimization(boundaries,m_cluster,k_cluster,m,k_max,epsilon,delta,gamma,theta,radius,seed)
+        function obj = SD(boundaries,m_cluster,k_cluster,m,k_max,epsilon,delta,gamma,theta,radius,seed)
             obj.boundaries = boundaries;
             obj.dim = size(obj.boundaries,1);
             obj.m_cluster = m_cluster;
@@ -203,10 +203,10 @@ classdef spiral_optimization < handle
             end
         end
 
-        function final_root = root_elimination(obj,root_archive)
+        function clean_roots = root_elimination(obj,root_archive)
             eligible_roots = [];
             for i = 1:size(root_archive,1)
-                if obj.objective_function(root_archive(i,:)) < -1 + obj.epsilon  *1e4
+                if obj.objective_function(root_archive(i,:)) < -1 + obj.epsilon
                     eligible_roots = [eligible_roots; root_archive(i,:)];
                 end
             end
@@ -239,9 +239,9 @@ classdef spiral_optimization < handle
             if ~isempty(deselected_id_duplicated_roots)
                 unique_roots = true(size(eligible_roots,1),1);
                 unique_roots(deselected_id_duplicated_roots) = false;
-                final_root = eligible_roots(unique_roots,:);
+                clean_roots = eligible_roots(unique_roots,:);
             else
-                final_root = eligible_roots;
+                clean_roots = eligible_roots;
             end
         end
 
