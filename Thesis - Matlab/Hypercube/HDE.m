@@ -13,6 +13,8 @@ classdef HDE < handle
         cluster
         archive
         score
+        final_root
+        final_score
     end
     
     methods
@@ -30,6 +32,8 @@ classdef HDE < handle
             obj.cluster = {};
             obj.archive = {};
             obj.score = [];
+            obj.final_root = [];
+            obj.final_score = [];
         end
         
         function F_array = system_equations(obj,x)
@@ -204,14 +208,13 @@ classdef HDE < handle
             end
             % Convert cluster to array
             obj.cluster = cat(3, obj.cluster{:});
-            fprintf("Number of clusters containing root: %d\n", size(obj.cluster, 3));
         end
 
         function final_root = root_elimination(obj,root_archive)
             eligible_roots = [];
             for i = 1:size(root_archive,1)
                 if obj.objective_function(root_archive(i,:)) < -1 + obj.epsilon
-                    eligible_roots = [eligible_roots; root_archive(i,:)]
+                    eligible_roots = [eligible_roots; root_archive(i,:)];
                 end
             end
             
@@ -247,7 +250,11 @@ classdef HDE < handle
             end
         end
 
-        function final_root = DE_evaluation(obj, verbose, superverbose)
+        function [final_root,final_score] = DE_evaluation(obj, verbose, superverbose)
+            obj.clustering()
+            if verbose == true
+                fprintf("Number of clusters containing root: %d\n", size(obj.cluster, 3));
+            end
             for i = 1:size(obj.cluster, 3)
                 subbound = zeros(obj.dim, 2);
                 for d = 1:size(obj.cluster, 2)
@@ -273,6 +280,67 @@ classdef HDE < handle
             end
 
             final_root = root_elimination(obj, archive_matrix);
+            final_score = zeros(1, size(final_root,1));
+            for fin_iter = 1:size(final_root,1)
+                final_score(fin_iter) = obj.objective_function(final_root(fin_iter, :));
+            end
+            obj.final_root = final_root;
+            obj.final_score = final_score;
+        end
+
+        function visualization2D(obj,visual_properties)
+            if visual_properties.save_visual == true
+                writerObj = VideoWriter(visual_properties.file_name);
+                writerObj.FrameRate = 5;  % Adjust the frame rate as needed
+                open(writerObj);
+            end
+
+            % Create a figure with visibility off
+            if visual_properties.show_visual == false
+                fig = figure('Visible', 'off');
+            else 
+                fig = figure('Visible', 'on');
+            end
+
+            % Adjust aspect ratio
+            axis equal;
+            pbaspect([diff(xlim()) diff(ylim()) 1]);
+            
+            % Maximize figure window
+            set(gcf, 'WindowState', 'maximized');
+
+            xlim(obj.boundaries(1,:));
+            ylim(obj.boundaries(2,:));
+            hold on
+            rectangle('Position',[obj.boundaries(:,1)',(obj.boundaries(:,2)-obj.boundaries(:,1))'],'EdgeColor','#FF0000')
+            for i = 1:size(obj.cluster, 3)
+                subbound = zeros(obj.dim, 2);
+                for d = 1:size(obj.cluster, 2)
+                    subbound(d, :) = [min(obj.cluster(:, d, i)), max(obj.cluster(:, d, i))];
+                end
+                
+                rectangle('Position',[subbound(:,1)',(subbound(:,2)-subbound(:,1))'],'EdgeColor','#4DBEEE')
+                pause(0.25)
+                if visual_properties.save_visual == true
+                    frame = getframe(gcf);
+                    writeVideo(writerObj, frame);
+                end
+            end
+
+            for j = 1: size(obj.final_root,1)
+                plot(obj.final_root(j,1), obj.final_root(j,2), '*',Color='magenta');
+                pause(0.25)
+                if visual_properties.save_visual == true
+                    frame = getframe(gcf);
+                    writeVideo(writerObj, frame);
+                end
+            end
+            hold off
+
+            if visual_properties.save_visual == true
+                close(writerObj);
+            end
+
         end
 
     end
