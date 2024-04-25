@@ -167,7 +167,20 @@ classdef SDGA < handle
             obj.cluster_radius(min_dist_id) = norm(y - xt);
         end
 
-        function clustering(obj)
+        function clustering(obj,visual_properties)
+            if visual_properties.save_visual == true
+                writerObj = VideoWriter(visual_properties.file_name);
+                writerObj.FrameRate = 5;  % Adjust the frame rate as needed
+                open(writerObj);
+            end
+
+            % Create a figure with visibility off
+            if visual_properties.show_visual == false
+                fig = figure('Visible', 'off');
+            else 
+                fig = figure('Visible', 'on');
+            end
+
             k = 0;
             while k < obj.k_cluster
                 potential_cluster_center = [];
@@ -185,10 +198,42 @@ classdef SDGA < handle
                     obj.function_cluster(potential_cluster_center(i,:));
                 end
             
+                if visual_properties.show_visual == true || visual_properties.save_visual == true
+                    scatter(obj.cluster_iter_points(:,1), obj.cluster_iter_points(:,2), 30, 'filled');
+                    rectangle('Position',[obj.boundaries(:,1)',(obj.boundaries(:,2)-obj.boundaries(:,1))'],'EdgeColor','#FF0000')
+                    xlim(1.5 * obj.boundaries(1,:));
+                    ylim(1.5 * obj.boundaries(2,:));
+
+                    % Adjust aspect ratio
+                    axis equal;
+                    pbaspect([diff(xlim()) diff(ylim()) 1]);
+                    
+                    % Maximize figure window
+                    set(gcf, 'WindowState', 'maximized');
+
+                    for c = 1:size(obj.cluster_center,1)
+                        hold on
+                        plot(obj.cluster_center(c,1), obj.cluster_center(c,2), 'o');
+                        viscircles(obj.cluster_center(c,:), obj.cluster_radius(c), Color="#00FFFF", Linestyle='-.');
+                        hold off
+                    end
+                    pause(0.25)
+                    
+                    if visual_properties.save_visual == true
+                        frame = getframe(gcf);
+                        writeVideo(writerObj, frame);
+                    end
+                end
+
                 obj.cluster_iter_points = obj.recombination(obj.cluster_iter_points,obj.mutation_rate,obj.boundaries);
             
                 k = k + 1;
             end
+
+            if visual_properties.save_visual == true
+                close(writerObj);
+            end
+
         end
 
         function clean_roots = root_elimination(obj,root_archive)
@@ -231,21 +276,22 @@ classdef SDGA < handle
                     clean_roots = eligible_roots;
                 end
             else
-                clean_roots = eligible_roots
+                clean_roots = eligible_roots;
             end
         end
 
-        function final_root = GA_evaluation(obj,verbose, superverbose)
+        function [final_root,final_score] = GA_evaluation(obj,verbose, superverbose,visual_properties)
             obj.initialization();
-            obj.clustering();
-            fprintf("%d roots found!",numel(obj.cluster_radius))
+            obj.clustering(visual_properties);
+            if verbose == true
+                fprintf("%d roots found!\n",numel(obj.cluster_radius))
+            end
             
             archive = [];
             score = [];
             
             for i = 1:length(obj.cluster_center)
-                subbound = [obj.cluster_center(i,:) - obj.cluster_radius(i); 
-                            obj.cluster_center(i,:) + obj.cluster_radius(i)];
+                subbound = [obj.cluster_center(i,:)' - obj.cluster_radius(i), obj.cluster_center(i,:)' + obj.cluster_radius(i)];
                 [root, root_score] = obj.GA(obj.m,subbound,obj.k_max,obj.mutation_rate,obj.seed,superverbose);
                 archive = [archive;root];
                 score = [score;root_score];
@@ -254,8 +300,11 @@ classdef SDGA < handle
                     disp(archive);
                 end
             end
-            archive
             final_root = obj.root_elimination(archive);
+            final_score = zeros(1, size(final_root,1));
+            for fin_iter = 1:size(final_root,1)
+                final_score(fin_iter) = obj.objective_function(final_root(fin_iter, :));
+            end
         end
 
 

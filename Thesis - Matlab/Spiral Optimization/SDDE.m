@@ -102,13 +102,13 @@ classdef SDDE < handle
             dv_i = obj.mutate(population, mutation_factor);
         
             % Set penalty for every donor vector that violates the boundaries
-            for j = 1:size(dv_i, 2)
-                if dv_i(j) < boundaries(j, 1)
-                    dv_i(j) = (x_i(j) + boundaries(j, 1)) / 2;
-                elseif dv_i(j) > boundaries(j, 2)
-                    dv_i(j) = (x_i(j) + boundaries(j, 2)) / 2;
-                end
-            end
+            % for j = 1:size(dv_i, 2)
+            %     if dv_i(j) < boundaries(j, 1)
+            %         dv_i(j) = (x_i(j) + boundaries(j, 1)) / 2;
+            %     elseif dv_i(j) > boundaries(j, 2)
+            %         dv_i(j) = (x_i(j) + boundaries(j, 2)) / 2;
+            %     end
+            % end
         end
 
         function result_population = reproduction(obj,population,boundaries,mutation_factor,crossover_rate,seed)
@@ -193,10 +193,10 @@ classdef SDDE < handle
 
             if (Fxt > Fy) && (Fxt > Fxc)
                 obj.cluster_center = [obj.cluster_center; y];
-                obj.cluster_radius = [obj.cluster_radius; norm(y - xt)];
+                obj.cluster_radius = [obj.cluster_radius; norm((y - xt),2)];
             elseif (Fxt < Fy) && (Fxt < Fxc)
                 obj.cluster_center = [obj.cluster_center; y];
-                obj.cluster_radius = [obj.cluster_radius; norm(y - xt)];
+                obj.cluster_radius = [obj.cluster_radius; norm((y - xt),2)];
                 obj.function_cluster(xt);
             elseif Fy < Fxc
                 obj.cluster_center(min_dist_id, :) = y;
@@ -205,7 +205,20 @@ classdef SDDE < handle
             obj.cluster_radius(min_dist_id) = norm(y - xt);
         end
 
-        function clustering(obj)
+        function clustering(obj,visual_properties)
+            if visual_properties.save_visual == true
+                writerObj = VideoWriter(visual_properties.file_name);
+                writerObj.FrameRate = 5;  % Adjust the frame rate as needed
+                open(writerObj);
+            end
+
+            % Create a figure with visibility off
+            if visual_properties.show_visual == false
+                fig = figure('Visible', 'off');
+            else 
+                fig = figure('Visible', 'on');
+            end
+
             k = 0;
             while k < obj.k_cluster
                 potential_cluster_center = [];
@@ -223,11 +236,43 @@ classdef SDDE < handle
                     obj.function_cluster(potential_cluster_center(i,:));
                 end
             
+                if visual_properties.show_visual == true || visual_properties.save_visual == true
+                    scatter(obj.cluster_iter_points(:,1), obj.cluster_iter_points(:,2), 30, 'filled');
+                    rectangle('Position',[obj.boundaries(:,1)',(obj.boundaries(:,2)-obj.boundaries(:,1))'],'EdgeColor','#FF0000')
+                    xlim(1.5 * obj.boundaries(1,:));
+                    ylim(1.5 * obj.boundaries(2,:));
+                    
+                    % Adjust aspect ratio
+                    axis equal;
+                    pbaspect([diff(xlim()) diff(ylim()) 1]);
+                    
+                    % Maximize figure window
+                    set(gcf, 'WindowState', 'maximized');
+                    
+                    for c = 1:size(obj.cluster_center,1)
+                        hold on
+                        plot(obj.cluster_center(c,1), obj.cluster_center(c,2), 'o');
+                        viscircles(obj.cluster_center(c,:), obj.cluster_radius(c), Color="#00FFFF", Linestyle='-.');
+                        hold off
+                    end
+                    pause(0.25)
+                    
+                    if visual_properties.save_visual == true
+                        frame = getframe(gcf);
+                        writeVideo(writerObj, frame);
+                    end
+                end
+
                 obj.cluster_iter_points = obj.reproduction(obj.cluster_iter_points, ...
                     obj.boundaries,obj.mutation_factor,obj.crossover_rate,obj.seed);
             
                 k = k + 1;
             end
+
+            if visual_properties.save_visual == true
+                close(writerObj);
+            end
+
         end
 
         function clean_roots = root_elimination(obj,root_archive)
@@ -238,50 +283,55 @@ classdef SDDE < handle
                 end
             end
             
-            id_duplicated_roots = [];
-            for i = 1:length(eligible_roots)
-                for j = i+1:length(eligible_roots)
-                    if norm(eligible_roots(i,:) - eligible_roots(j,:)) < obj.delta
-                        id_duplicated_roots = [id_duplicated_roots; [i, j]];
+            if size(eligible_roots,1) >1
+                id_duplicated_roots = [];
+                for i = 1:length(eligible_roots)
+                    for j = i+1:length(eligible_roots)
+                        if norm(eligible_roots(i,:) - eligible_roots(j,:)) < obj.delta
+                            id_duplicated_roots = [id_duplicated_roots; [i, j]];
+                        end
                     end
                 end
-            end
-            
-            id_duplicated_roots = unique(id_duplicated_roots, 'rows');
-            
-            deselected_id_duplicated_roots = [];
-            for i = 1:size(id_duplicated_roots, 1)
-                root_a = obj.objective_function(eligible_roots(id_duplicated_roots(i, 1),:));
-                root_b = obj.objective_function(eligible_roots(id_duplicated_roots(i, 2),:));
-                if root_a <= root_b
-                    id_duplicated_root = id_duplicated_roots(i, 2);
-                else
-                    id_duplicated_root = id_duplicated_roots(i, 1);
+                
+                id_duplicated_roots = unique(id_duplicated_roots, 'rows');
+                
+                deselected_id_duplicated_roots = [];
+                for i = 1:size(id_duplicated_roots, 1)
+                    root_a = obj.objective_function(eligible_roots(id_duplicated_roots(i, 1),:));
+                    root_b = obj.objective_function(eligible_roots(id_duplicated_roots(i, 2),:));
+                    if root_a <= root_b
+                        id_duplicated_root = id_duplicated_roots(i, 2);
+                    else
+                        id_duplicated_root = id_duplicated_roots(i, 1);
+                    end
+                    deselected_id_duplicated_roots = [deselected_id_duplicated_roots; id_duplicated_root];
+                
                 end
-                deselected_id_duplicated_roots = [deselected_id_duplicated_roots; id_duplicated_root];
-            end
-            
-            
-            if ~isempty(deselected_id_duplicated_roots)
-                unique_roots = true(size(eligible_roots,1),1);
-                unique_roots(deselected_id_duplicated_roots) = false;
-                clean_roots = eligible_roots(unique_roots,:);
+                
+                if ~isempty(deselected_id_duplicated_roots)
+                    unique_roots = true(size(eligible_roots,1),1);
+                    unique_roots(deselected_id_duplicated_roots) = false;
+                    clean_roots = eligible_roots(unique_roots,:);
+                else
+                    clean_roots = eligible_roots;
+                end
             else
                 clean_roots = eligible_roots;
             end
         end
 
-        function final_root = DE_evaluation(obj,verbose, superverbose)
+        function [final_root,final_score] = DE_evaluation(obj,verbose, superverbose,visual_properties)
             obj.initialization();
-            obj.clustering();
-            fprintf("%d roots found!",numel(obj.cluster_radius))
+            obj.clustering(visual_properties);
+            if verbose == true
+                fprintf("%d roots found!\n",numel(obj.cluster_radius))
+            end
             
             archive = [];
             score = [];
             
             for i = 1:length(obj.cluster_center)
-                subbound = [obj.cluster_center(i,:) - obj.cluster_radius(i); 
-                            obj.cluster_center(i,:) + obj.cluster_radius(i)];
+                subbound = [obj.cluster_center(i,:)' - obj.cluster_radius(i), obj.cluster_center(i,:)' + obj.cluster_radius(i)];
                 [root, root_score] = obj.DE(subbound,obj.m,obj.k_max,obj.mutation_factor,obj.crossover_rate,obj.seed,superverbose);
                 archive = [archive;root];
                 score = [score;root_score];
@@ -291,6 +341,10 @@ classdef SDDE < handle
                 end
             end
             final_root = obj.root_elimination(archive);
+            final_score = zeros(1, size(final_root,1));
+            for fin_iter = 1:size(final_root,1)
+                final_score(fin_iter) = obj.objective_function(final_root(fin_iter, :));
+            end
         end
 
 

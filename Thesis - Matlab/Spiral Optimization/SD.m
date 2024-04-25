@@ -36,7 +36,7 @@ classdef SD < handle
         
         function F_array = system_equations(obj,x)
             f1 = exp(x(1)-x(2)) - sin(x(1)+x(2));
-            f2 = (x(1)*x(2))^2 - cos(x(1)+x(2));
+            f2 = x(1)^2*x(2)^2 - cos(x(1)+x(2));
             F_array = [f1; f2];
         end
 
@@ -74,6 +74,11 @@ classdef SD < handle
                points(:,i)=round((boundaries(i,1)+(boundaries(i,2)-boundaries(i,1)).*A(:,i))*100)/100;
             end
         end
+
+        function eligible_points = inside_boundaries(obj,points, boundaries)
+            criterion = all(points >= boundaries(:, 1)' & points <= boundaries(:, 2)',2);
+            eligible_points = points(criterion,:);
+        end
         
         function Rn_ij = generate_Rij(obj, i, j)
             Rn_ij = eye(obj.dim);
@@ -94,7 +99,7 @@ classdef SD < handle
             end
         end
 
-        function new_set_of_points = update_point(obj, set_of_points)
+        function [new_set_of_points,x_i_g] = update_point(obj, set_of_points)
             Sn = obj.radius * obj.generate_Rn();
             fitness = zeros(size(set_of_points, 1), 1);
             for i = 1:size(set_of_points, 1)
@@ -126,7 +131,7 @@ classdef SD < handle
             points = obj.generate_points(n_point,boundaries,seed);
             iter = 0;
             while iter <= max_iter 
-                new_points = obj.update_point(points);
+                [new_points,x_star] = obj.update_point(points);
                 error = obj.iter_error(points, new_points);
                 if error < max_error
                     break;
@@ -134,7 +139,7 @@ classdef SD < handle
                 iter = iter + 1;
                 points = new_points;
             end
-            return_points = mean(points,1);
+            return_points = x_star;
             return_points_value = obj.objective_function(return_points);
         end
         
@@ -167,10 +172,10 @@ classdef SD < handle
 
             if (Fxt > Fy) && (Fxt > Fxc)
                 obj.cluster_center = [obj.cluster_center; y];
-                obj.cluster_radius = [obj.cluster_radius; norm(y - xt)];
+                obj.cluster_radius = [obj.cluster_radius; norm((y - xt),2)];
             elseif (Fxt < Fy) && (Fxt < Fxc)
                 obj.cluster_center = [obj.cluster_center; y];
-                obj.cluster_radius = [obj.cluster_radius; norm(y - xt)];
+                obj.cluster_radius = [obj.cluster_radius; norm((y - xt),2)];
                 obj.function_cluster(xt);
             elseif Fy < Fxc
                 obj.cluster_center(min_dist_id, :) = y;
@@ -179,27 +184,72 @@ classdef SD < handle
             obj.cluster_radius(min_dist_id) = norm(y - xt);
         end
 
-        function clustering(obj)
+        function clustering(obj, visual_properties)
+            if visual_properties.save_visual == true
+                writerObj = VideoWriter(visual_properties.file_name);
+                writerObj.FrameRate = 5;  % Adjust the frame rate as needed
+                open(writerObj);
+            end
+
+            % Create a figure with visibility off
+            if visual_properties.show_visual == false
+                fig = figure('Visible', 'off');
+            else 
+                fig = figure('Visible', 'on');
+            end
+
             k = 0;
             while k < obj.k_cluster
                 potential_cluster_center = [];
                 for i = 1:size(obj.cluster_iter_points,1)
                     func_point = obj.objective_function(obj.cluster_iter_points(i,:));
-            
+        
                     % If F(x_i)<gamma and x_i is not the center of existing cluster, x_i may have a possibility to become a cluster center
-                    exist_in_cluster_center = any(vecnorm(obj.cluster_iter_points(i,:) - obj.cluster_center) < obj.epsilon);
+                    exist_in_cluster_center = any(vecnorm(obj.cluster_iter_points(i,:) - obj.cluster_center) < obj.delta);
                     if func_point < obj.gamma && exist_in_cluster_center == 0
                         potential_cluster_center = [potential_cluster_center; obj.cluster_iter_points(i,:)];
                     end
                 end
+        
                 % Apply function cluster
                 for i = 1:size(potential_cluster_center,1)
                     obj.function_cluster(potential_cluster_center(i,:));
                 end
-            
-                obj.cluster_iter_points = obj.update_point(obj.cluster_iter_points);
-            
+        
+                if visual_properties.show_visual == true || visual_properties.save_visual == true
+                    scatter(obj.cluster_iter_points(:,1), obj.cluster_iter_points(:,2), 30, 'filled');
+                    rectangle('Position',[obj.boundaries(:,1)',(obj.boundaries(:,2)-obj.boundaries(:,1))'],'EdgeColor','#FF0000')
+                    xlim(1.5 * obj.boundaries(1,:));
+                    ylim(1.5 * obj.boundaries(2,:));
+                    
+                    % Adjust aspect ratio
+                    axis equal;
+                    pbaspect([diff(xlim()) diff(ylim()) 1]);
+                    
+                    % Maximize figure window
+                    set(gcf, 'WindowState', 'maximized');
+                    
+                    for c = 1:size(obj.cluster_center,1)
+                        hold on
+                        plot(obj.cluster_center(c,1), obj.cluster_center(c,2), '*',Color='magenta');
+                        viscircles(obj.cluster_center(c,:), obj.cluster_radius(c), Color="#00FFFF", Linestyle='-.');
+                        hold off
+                    end
+                    pause(0.25)
+                    
+                    if visual_properties.save_visual == true
+                        frame = getframe(gcf);
+                        writeVideo(writerObj, frame);
+                    end
+                end
+        
+                [obj.cluster_iter_points] = obj.update_point(obj.cluster_iter_points);
+        
                 k = k + 1;
+            end
+        
+            if visual_properties.save_visual == true
+                close(writerObj);
             end
         end
 
@@ -211,59 +261,71 @@ classdef SD < handle
                 end
             end
             
-            
-            id_duplicated_roots = [];
-            for i = 1:length(eligible_roots)
-                for j = i+1:length(eligible_roots)
-                    if norm(eligible_roots(i,:) - eligible_roots(j,:)) < obj.delta
-                        id_duplicated_roots = [id_duplicated_roots; [i, j]];
+            if size(eligible_roots,1) >1
+                id_duplicated_roots = [];
+                for i = 1:length(eligible_roots)
+                    for j = i+1:length(eligible_roots)
+                        if norm(eligible_roots(i,:) - eligible_roots(j,:)) < obj.delta
+                            id_duplicated_roots = [id_duplicated_roots; [i, j]];
+                        end
                     end
                 end
-            end
-            
-            id_duplicated_roots = unique(id_duplicated_roots, 'rows');
-            
-            deselected_id_duplicated_roots = [];
-            for i = 1:size(id_duplicated_roots, 1)
-                root_a = obj.objective_function(eligible_roots(id_duplicated_roots(i, 1),:));
-                root_b = obj.objective_function(eligible_roots(id_duplicated_roots(i, 2),:));
-                if root_a <= root_b
-                    id_duplicated_root = id_duplicated_roots(i, 2);
-                else
-                    id_duplicated_root = id_duplicated_roots(i, 1);
+                
+                id_duplicated_roots = unique(id_duplicated_roots, 'rows');
+                
+                deselected_id_duplicated_roots = [];
+                for i = 1:size(id_duplicated_roots, 1)
+                    root_a = obj.objective_function(eligible_roots(id_duplicated_roots(i, 1),:));
+                    root_b = obj.objective_function(eligible_roots(id_duplicated_roots(i, 2),:));
+                    if root_a <= root_b
+                        id_duplicated_root = id_duplicated_roots(i, 2);
+                    else
+                        id_duplicated_root = id_duplicated_roots(i, 1);
+                    end
+                    deselected_id_duplicated_roots = [deselected_id_duplicated_roots; id_duplicated_root];
+                
                 end
-                deselected_id_duplicated_roots = [deselected_id_duplicated_roots; id_duplicated_root];
-            end
-            
-            
-            if ~isempty(deselected_id_duplicated_roots)
-                unique_roots = true(size(eligible_roots,1),1);
-                unique_roots(deselected_id_duplicated_roots) = false;
-                clean_roots = eligible_roots(unique_roots,:);
+                
+                if ~isempty(deselected_id_duplicated_roots)
+                    unique_roots = true(size(eligible_roots,1),1);
+                    unique_roots(deselected_id_duplicated_roots) = false;
+                    clean_roots = eligible_roots(unique_roots,:);
+                else
+                    clean_roots = eligible_roots;
+                end
             else
                 clean_roots = eligible_roots;
             end
         end
 
-        function final_root = spiral_opt_evaluation(obj,verbose)
-            obj.initialization()
-            obj.clustering()
+        function [final_root,final_score] = spiral_opt_evaluation(obj,verbose,visual_properties)
+            obj.initialization();
+            obj.clustering(visual_properties);
+            if verbose == true
+                fprintf("%d roots found!\n",numel(obj.cluster_radius))
+            end
             
             archive = [];
             score = [];
             
             for i = 1:length(obj.cluster_center)
-                subbound = [obj.cluster_center(i,:) - obj.cluster_radius(i); 
-                            obj.cluster_center(i,:) + obj.cluster_radius(i)];
+                subbound = [obj.cluster_center(i,:)' - obj.cluster_radius(i), obj.cluster_center(i,:)' + obj.cluster_radius(i)];
                 [root, root_score] = obj.spiral_opt(subbound, obj.m, obj.k_max, obj.epsilon,obj.seed);
-                archive = [archive;root];
-                score = [score;root_score];
+                inside_root = obj.inside_boundaries(root,obj.boundaries);
+                if ~isempty(inside_root)
+                    archive = [archive;root];
+                    score = [score;root_score];
+                end
                 if verbose == true
                     fprintf('\n====== Cluster %d ======\n', i);
                     disp(archive);
                 end
             end
             final_root = obj.root_elimination(archive);
+            final_score = zeros(1, size(final_root,1));
+            for fin_iter = 1:size(final_root,1)
+                final_score(fin_iter) = obj.objective_function(final_root(fin_iter, :));
+            end
         end
 
     end
