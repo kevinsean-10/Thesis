@@ -42,11 +42,11 @@ classdef RADE < handle
             F_array = [f1; f2];
         end
 
-%         function res = objective_function(obj, x)
-%             F_array = obj.system_equations(x);
-%             res = sum(abs(F_array));
-%             res = -1 / (1 + res);
-%         end
+        % function res = objective_function(obj, x)
+        %     F_array = obj.system_equations(x);
+        %     res = sum(abs(F_array));
+        %     res = -1 / (1 + res);
+        % end
 
         function res = objective_function(obj,x)
             res = 0;
@@ -176,7 +176,7 @@ classdef RADE < handle
             % Outputs:
             % archive: updated archive
         
-            f_x = obj.objective_function(x)
+            f_x = obj.objective_function(x);
             s = size(obj.archive,1); % current archive size
 
             if f_x < obj.theta % x is a root
@@ -266,7 +266,7 @@ classdef RADE < handle
             end
         end
 
-        function DE_evaluation(obj,verbose)
+        function [final_root,final_score] = DE_evaluation(obj,verbose)
             rng(obj.seed);
             population = obj.generate_points(obj.population_size,obj.boundaries,obj.seed);
             
@@ -274,14 +274,22 @@ classdef RADE < handle
             for i = 1:obj.population_size
                 fitness(i) = obj.objective_function(population(i, :));
             end
+            
             [best_fitness, best_idx] = min(fitness);
             best = population(best_idx, :);
             subpop = zeros(obj.num_per_subpopulation,obj.dim,obj.population_size);
             for i = 1:obj.population_size
                 subpop(:, :, i) = obj.subpopulating(population(i, :), population, obj.num_per_subpopulation);
             end
+
+            fig = figure('Visible', 'on');
+
             k=1;
             for gen = 1:obj.max_generation
+                scatter(population(:,1), population(:,2), 30, 'filled');
+                rectangle('Position',[obj.boundaries(:,1)',(obj.boundaries(:,2)-obj.boundaries(:,1))'],'EdgeColor','#FF0000')
+                xlim(1.5 * obj.boundaries(1,:));
+                ylim(1.5 * obj.boundaries(2,:));
                 S_F = [];
                 S_CR = [];
                 for i = 1:obj.population_size
@@ -304,11 +312,6 @@ classdef RADE < handle
                             best = trial;
                         end
                     end
-                    if verbose
-                        fprintf("=========Generation %d=========\n", gen);
-                        disp("Archive:");
-                        disp(obj.archive);
-                    end
                     if ~isempty(S_F) && ~isempty(S_CR)
                         obj.update_history(S_F, S_CR, k);
                         k = k + 1;
@@ -316,8 +319,35 @@ classdef RADE < handle
                             k = 1;
                         end
                     end
+
                 end
+                if verbose
+                    fprintf("=========Generation %d=========\n", gen);
+                    disp("Archive:");
+                    disp(obj.archive);
+                end
+
+    
+                % Adjust aspect ratio
+                axis equal;
+                pbaspect([diff(xlim()) diff(ylim()) 1]);
+    
+                % Maximize figure window
+                set(gcf, 'WindowState', 'maximized');
+                if ~isempty(obj.archive)
+                    hold on
+                    plot(obj.archive(:,1), obj.archive(:,2), '*',Color='magenta');
+                    hold off
+                end
+                pause(0.05)
+
             end
+            final_root = obj.archive;
+            final_score = zeros(1, size(final_root,1));
+            for fin_iter = 1:size(final_root,1)
+                final_score(fin_iter) = obj.objective_function(final_root(fin_iter, :));
+            end
+
         end
 
 

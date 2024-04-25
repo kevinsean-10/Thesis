@@ -1,13 +1,13 @@
 clear; clc
 
 pop_size=1000;
-max_gen=100;
+max_gen=1000;
 F_init=0.5;
 CR_init=0.5;
-num_l=5;
+num_l=20;
 theta=1e-3;
 tau_d=0.4;
-s_max=100;
+s_max=50;
 print_gen=true;
 Hm = 50;
 dim = 2;

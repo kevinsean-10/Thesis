@@ -1,18 +1,19 @@
+%% Trial
 clear; clc
 
-pop_size=100;
-max_gen=100;
+pop_size=250;
+max_gen=250;
 F_init=0.5;
 CR_init=0.5;
 num_l=20;
 theta=1e-3;
 tau_d=0.4;
-s_max=100;
+s_max=20;
 print_gen=true;
-Hm = 100;
+Hm = 50;
 dim = 2;
 seed = 'shuffle';
-beta = 100;
+beta = 10;
 rho = 1e-8;
 
 % Define boundaries
@@ -22,8 +23,13 @@ boundaries = repmat([-10, 10], dim, 1);
 
 radeopt = RADE(boundaries,pop_size,num_l,max_gen,s_max,theta,tau_d,F_init,CR_init,Hm,beta,rho,seed);
 
-radeopt.DE_evaluation(print_gen)
-radeopt.archive
+[final_root,final_score] = radeopt.DE_evaluation(print_gen)
+% radeopt.archive
+
+%% %% Exporting Statistic
+clear; clc;
+
+
 
 %%
 % rng(seed);
@@ -75,4 +81,4 @@ radeopt.archive
 %     end
 % end
 
-radeopt.archive
+% radeopt.archive

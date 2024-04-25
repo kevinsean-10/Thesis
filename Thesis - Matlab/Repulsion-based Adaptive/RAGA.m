@@ -266,7 +266,7 @@ classdef RAGA < handle
             end
         end
 
-        function DE_evaluation(obj,verbose)
+        function [final_root,final_score] = GA_evaluation(obj,verbose)
             rng(obj.seed);
             population = obj.generate_points(obj.population_size,obj.boundaries,obj.seed);
             
@@ -332,6 +332,11 @@ classdef RAGA < handle
                         memory_id = 1;
                     end
                 end
+            end
+            final_root = obj.archive;
+            final_score = zeros(1, size(final_root,1));
+            for fin_iter = 1:size(final_root,1)
+                final_score(fin_iter) = obj.objective_function(final_root(fin_iter, :));
             end
         end
 
