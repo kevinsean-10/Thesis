@@ -28,7 +28,7 @@ elseif (FObj(Xt)> FObj(y)) && (FObj(Xt) > FObj(XC))
     xc_clust=y;
     xc_rad=norm((y-Xt),2);
     [XC,xc_clust,cl_near]=clustering(Xt,xcc);
-else FObj(y)>FObj(XC)
+else FObj(y)>FObj(XC);
     XC=y;
 end
 

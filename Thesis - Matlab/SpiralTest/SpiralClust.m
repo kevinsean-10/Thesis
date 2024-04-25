@@ -4,7 +4,7 @@ clc; clear all; %close all;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
  
-N=350;           % number of sample points
+N=250;           % number of sample points
 nVar=2;           % number of decision variables
 
 
@@ -35,8 +35,8 @@ end
 %% clustering dan spiral parameter
 mcl=N;
 gamma=0.2;
-eps=10^-6;
-delta=0.005;
+eps=1e-7;
+delta=0.01;
 kcl=10;
 m=250;
 r=0.95;
@@ -49,6 +49,7 @@ cl_num=1;
 xc(cl_num,1:nVar)=[z(ind,1),z(ind,2)];
 cl_rad(cl_num)=min(0.5*abs(UB(1)-LB(1)),0.5*(UB(2)-LB(2)));
 
+%%
 for k=1:kcl
     for i=1:mcl
          
@@ -85,20 +86,7 @@ for k=1:kcl
 %         end
 %         pause(0.5)
     end
-    
-    for i=1:N
-        FO(i)=FObj(z(i,:));
-    end
 
-   [Maxval,ind]=max(FO);  
-    xp(k,:)=[z(ind,1),z(ind,2)];
-    
-    for i=1:N
-        zb(i,:)=[r,0;0,r]*[cos(theta),-sin(theta);sin(theta),cos(theta)]*(z(i,:)'-xp(k,:)')-xp(k,:)';...
-%             zb(i,:)=[r,0;0,r]*[cos(theta),-sin(theta);sin(theta),cos(theta)]*z(i,:)'-([r,0;0,r]*[cos(theta),-sin(theta);sin(theta),cos(theta)]-[1,0;0,1])*xp(k,:)';
-    end
-    
-    z=zb;
     plot(z(:,1),z(:,2),'.');
     for i=1:cl_num
         hold on
@@ -107,6 +95,21 @@ for k=1:kcl
         hold off 
     end
 %     pause
+
+    for i=1:N
+        FO(i)=FObj(z(i,:));
+    end
+
+   [Maxval,ind]=max(FO);  
+    xp(k,:)=[z(ind,1),z(ind,2)];
+    
+    for i=1:N
+        zb(i,:)=[r,0;0,r]*[cos(theta),-sin(theta);sin(theta),cos(theta)]*(z(i,:)'-xp(k,:)')+xp(k,:)';...
+%             zb(i,:)=[r,0;0,r]*[cos(theta),-sin(theta);sin(theta),cos(theta)]*z(i,:)'-([r,0;0,r]*[cos(theta),-sin(theta);sin(theta),cos(theta)]-[1,0;0,1])*xp(k,:)';
+    end
+    
+    z=zb;
+
 
 end
 % return
@@ -148,7 +151,7 @@ for n=1:cl_num
     rc(n,3)=FObj(rc(n,:));
     cek_F(n)=1-FObj(rc(n,:));
      if cek_F(n)< eps && (abs(rc(n,1))<=10 && abs(rc(n,2))<=10)
-        akar(root_count,:)=rc(n,:);
+        akar(root_count,:)=rc(n,:)
         root_count=root_count+1;
      end
 end
@@ -174,6 +177,13 @@ akar_fin
 
 
 
- 
-
-
+ %%
+% clc;clear;
+% ccc = [1,2,3;3,4,5;5,6,7;7,8,9]
+% rrr = [1,2,3,4]
+% 
+% for i = 1:4
+%     sibo = [ccc(i,:)'-rrr(i),ccc(i,:)'+rrr(i)]
+%     LB=[ccc(i,1)-rrr(i),ccc(i,2)-rrr(i)]
+%     UB=[ccc(i,1)+rrr(i),ccc(i,2)+rrr(i)]
+% end
