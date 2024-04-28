@@ -14,9 +14,9 @@ m = 250;
 k_max = 250;
 seed = 'shuffle';
 verbose = true;
-print_stat = true;
+print_stat = false;
 visual_properties = struct('show_visual',true, ...
-    'save_visual', true, ...
+    'save_visual', false, ...
     'file_name', 'sdde.avi');
 
 % Define boundaries

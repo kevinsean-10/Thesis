@@ -16,7 +16,7 @@ visual_properties = struct('show_visual',true, ...
     'file_name', 'hga.avi');
 
 % how many parts/slices do you desire in each dimension? (even number only)
-parts = 100;
+parts = 200;
 
 boundaries = repmat([-10, 10], dim, 1);
 

@@ -213,8 +213,8 @@ classdef SDGA < handle
 
                     for c = 1:size(obj.cluster_center,1)
                         hold on
-                        plot(obj.cluster_center(c,1), obj.cluster_center(c,2), 'o');
-                        viscircles(obj.cluster_center(c,:), obj.cluster_radius(c), Color="#00FFFF", Linestyle='-.');
+                        plot(obj.cluster_center(c,1), obj.cluster_center(c,2), 'o','MarkerSize',1);
+                        viscircles(obj.cluster_center(c,:), obj.cluster_radius(c), Color="magenta",LineWidth=3);
                         hold off
                     end
                     pause(0.25)

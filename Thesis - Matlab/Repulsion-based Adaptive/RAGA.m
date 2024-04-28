@@ -10,6 +10,7 @@ classdef RAGA < handle
         beta
         rho
         archive
+        criterion
         max_archive_size
         memories_F
         memories_CR
@@ -29,6 +30,7 @@ classdef RAGA < handle
             obj.max_archive_size = max_archive_size;
             obj.max_generation = max_generation;
             obj.theta = theta;
+            obj.criterion = theta;
             obj.beta = beta;
             obj.rho = rho;
             obj.tau_d = tau_d;
@@ -45,19 +47,20 @@ classdef RAGA < handle
             F_array = [f1; f2];
         end
 
-%         function res = objective_function(obj, x)
-%             F_array = obj.system_equations(x);
-%             res = sum(abs(F_array));
-%             res = -1 / (1 + res);
-%         end
-
-        function res = objective_function(obj,x)
-            res = 0;
+        function res = objective_function(obj, x)
             F_array = obj.system_equations(x);
-            for i = 1:numel(F_array)
-                res = res + (F_array(i))^2;
-            end
+            res = sum(abs(F_array));
+            res = -1 / (1 + res);
+            obj.criterion = -1 + obj.theta;
         end
+
+        % function res = objective_function(obj,x)
+        %     res = 0;
+        %     F_array = obj.system_equations(x);
+        %     for i = 1:numel(F_array)
+        %         res = res + (F_array(i))^2;
+        %     end
+        % end
 
         function result = chi_p(obj, delta_j, rho)
             % Characteristic Function
@@ -103,7 +106,7 @@ classdef RAGA < handle
 
         function [selected_population,selected_indices] = selection(obj, population, fitness)
             pop_size = size(population, 1);
-            selection_probs = 1 ./ (fitness + 1); % add one to avoid division by zero
+            selection_probs = 1 ./ (fitness+1); % Make sure no division by zero
             total_probs = sum(selection_probs);
             selection_probs = selection_probs / total_probs;
             selected_indices = randsample(1:pop_size, pop_size, true, selection_probs);
@@ -169,7 +172,7 @@ classdef RAGA < handle
             subpopulation = population(closest_indices, :);
         end
 
-        function archive = update_archive(obj, x)
+        function archive = update_archive(obj, x, archive)
             % Update the archive with a new individual x
             % Inputs:
             % x: individual
@@ -177,39 +180,37 @@ classdef RAGA < handle
             % archive: updated archive
         
             f_x = obj.objective_function(x);
-            s = size(obj.archive,1); % current archive size
+            s = size(archive,1); % current archive size
 
-            if f_x < obj.theta % x is a root
+            if f_x < obj.criterion % x is a root
                 if s == 0 % archive is empty
-                    obj.archive = [obj.archive; x];
+                    archive = [archive; x];
                     s = s + 1;
                 else
                     % Find the closest solution x_prime in the archive to x in the decision space
-                    dist_list = vecnorm(x - obj.archive, 2, 2);
+                    dist_list = vecnorm(x - archive, 2, 2);
                     [dist_min, idx_min] = min(dist_list);
-                    x_prime = obj.archive(idx_min, :);
+                    x_prime = archive(idx_min, :);
                     f_x_prime = obj.objective_function(x_prime);
         
                     if dist_min < obj.tau_d % x and x_prime are too close
                         if f_x < f_x_prime
                             x_prime = x;
-                            obj.archive(idx_min, :) = x_prime;
+                            archive(idx_min, :) = x_prime;
                         end
                     else
                         if s < obj.max_archive_size
-                            obj.archive = [obj.archive; x];
+                            archive = [archive; x];
                             s = s + 1;
                         else % archive is full
                             if f_x < f_x_prime
                                 x_prime = x;
-                                obj.archive(idx_min, :) = x_prime;
+                                archive(idx_min, :) = x_prime;
                             end
                         end
                     end
                 end
             end
-        
-            archive = obj.archive;
         end
 
         function [Fi, CRi] = update_parameter(obj)
@@ -266,7 +267,7 @@ classdef RAGA < handle
             end
         end
 
-        function [final_root,final_score] = GA_evaluation(obj,verbose)
+        function [final_root,final_score] = GA_evaluation(obj,verbose,visual_properties)
             rng(obj.seed);
             population = obj.generate_points(obj.population_size,obj.boundaries,obj.seed);
             
@@ -276,14 +277,70 @@ classdef RAGA < handle
             end
             [best_fitness, best_idx] = min(fitness);
             best = population(best_idx, :);
-            subpopulation = zeros(obj.num_per_subpopulation,obj.dim,obj.population_size);
-            for i = 1:obj.population_size
-                subpopulation(:, :, i) = obj.subpopulating(population(i, :), population, obj.num_per_subpopulation);
-            end
+            % subpopulation = zeros(obj.num_per_subpopulation,obj.dim,obj.population_size);
+            % for i = 1:obj.population_size
+            %     subpopulation(:, :, i) = obj.subpopulating(population(i, :), population, obj.num_per_subpopulation);
+            % end
             
+            % Animation Saving Setting
+            if visual_properties.save_visual == true
+                writerObj = VideoWriter(visual_properties.file_name);
+                writerObj.FrameRate = 5;  % Adjust the frame rate as needed
+                open(writerObj);
+            end
+
+            % Create a figure with visibility off
+            if visual_properties.show_visual == false
+                fig = figure('Visible', 'off');
+            else 
+                fig = figure('Visible', 'on');
+                [X_surf, Y_surf] = meshgrid(linspace(obj.boundaries(1,1),obj.boundaries(1,2),100),linspace(obj.boundaries(2,1),obj.boundaries(2,2),100));
+                XY_surf = [X_surf(:),Y_surf(:)];
+                Z_surf = zeros(size(XY_surf,1),1);
+            end
+
             memory_id=1;
             
             for gen = 1:obj.max_generation 
+                if visual_properties.show_visual == true || visual_properties.save_visual == true
+                    answ = [-6.437160, 0.155348;
+                            -0.932122, 1.067870;
+                            -0.155283, 6.439840;
+                             0.163333, 6.122430;
+                             0.667121, 0.690103;
+                            -6.117110, -0.163476];
+                    
+                    for i=1:size(XY_surf,1)
+                        Z_surf(i) = obj.repulsion_function(XY_surf(i,:));
+                    end
+                    Z_surf = reshape(Z_surf, size(X_surf));
+                    subplot(2, 2, 1);
+                    surf(X_surf, Y_surf, Z_surf);
+                    view(0, 0);
+                    title("Tampak Samping")
+
+                    subplot(2, 2, 2);
+                    surf(X_surf, Y_surf, Z_surf);
+                    view(0, 90);
+                    title("Tampak Atas")
+
+                    subplot(2, 2, 3);
+                    surf(X_surf, Y_surf, Z_surf);
+                    view(0, -90);
+                    title("Tampak Bawah")
+
+                    subplot(2, 2, 4);
+                    scatter(answ(:,1),answ(:,2), 50,'magenta',"LineWidth",2);
+                    hold on;
+                    scatter(population(:,1), population(:,2), 5, 'filled', 'blue');    
+                    hold off;
+                    rectangle('Position',[obj.boundaries(:,1)',(obj.boundaries(:,2)-obj.boundaries(:,1))'],'EdgeColor','#FF0000')
+                    xlim(0.5*obj.boundaries(1,:));
+                    ylim(0.5*obj.boundaries(2,:));
+                end
+                for ind=1:obj.population_size
+                    obj.archive = obj.update_archive(population(ind,:),obj.archive);
+                end
                 S_F = [];
                 S_CR = [];
                 for i = 1:2:obj.population_size
@@ -292,16 +349,17 @@ classdef RAGA < handle
                     parent = zeros(2, obj.dim); % because of one-point crossover
                 
                     for j = 0:size(parent, 1)-1
-                        fitness_subpopulation = zeros(1,size(subpopulation,1));
-                        for k = 1:size(subpopulation,1)
-                            fitness_subpopulation(k) = obj.objective_function(subpopulation(k,:,i+j));
+                        subpopulation_i = obj.subpopulating(population(i+j, :), population, obj.num_per_subpopulation);
+                        fitness_subpopulation_i = zeros(1,obj.num_per_subpopulation);
+                        for k = 1:size(subpopulation_i,1)
+                            fitness_subpopulation_i(k) = obj.objective_function(subpopulation_i(k,:));
                         end
-                        [selected_subpopulation,selected_indices] = obj.selection(subpopulation(:,:,i+j),fitness_subpopulation);
-                        [~,min_idx_parent] = min(fitness_subpopulation(selected_indices));
+                        [selected_subpopulation,selected_indices] = obj.selection(subpopulation_i,fitness_subpopulation_i);
+                        [~,min_idx_parent] = min(fitness_subpopulation_i(selected_indices));
                         parent(j+1,:) = selected_subpopulation(min_idx_parent,:);
                     end
                     offspring_set = obj.crossover(parent(1,:),parent(2,:));
-                    
+                   
                     for k=1:size(offspring_set,1)
                         trial = obj.mutate(offspring_set(k,:),F_i,obj.boundaries);
                         trial_fitness = obj.fitness_function(trial);
@@ -310,13 +368,20 @@ classdef RAGA < handle
                         if trial_fitness < closest_trial_fitness
                             fitness(id_closest_trial) = trial_fitness;
                             population(id_closest_trial,:) = trial;
-                            obj.archive = obj.update_archive(trial);
                             S_F = [S_F, F_i];
                             S_CR = [S_CR, CR_i];
                             if trial_fitness < best_fitness
                                 best_idx = i;
                                 best = trial;
+                                best_fitness = trial_fitness
                             end
+                        end
+                    end
+                    if ~isempty(S_F) && ~isempty(S_CR)
+                        obj.update_history(S_F, S_CR, memory_id);
+                        memory_id = memory_id + 1;
+                        if memory_id > obj.max_memories_size
+                            memory_id = 1;
                         end
                     end
                 end
@@ -325,11 +390,24 @@ classdef RAGA < handle
                     disp("Archive:");
                     disp(obj.archive);
                 end
-                if ~isempty(S_F) && ~isempty(S_CR)
-                    obj.update_history(S_F, S_CR, memory_id);
-                    memory_id = memory_id + 1;
-                    if memory_id > obj.max_memories_size
-                        memory_id = 1;
+
+                if visual_properties.show_visual == true || visual_properties.save_visual == true
+                    % Adjust aspect ratio
+                    axis equal;
+                    pbaspect([diff(xlim()) diff(ylim()) 1]);
+        
+                    % Maximize figure window
+                    set(gcf, 'WindowState', 'maximized');
+                    if ~isempty(obj.archive)
+                        hold on
+                        plot(obj.archive(:,1), obj.archive(:,2),'*',Color='magenta',MarkerSize=50);
+                        hold off
+                    end
+                    title(sprintf("Generation %d",gen))
+                    pause(0.05)
+                    if visual_properties.save_visual == true
+                        frame = getframe(gcf);
+                        writeVideo(writerObj, frame);
                     end
                 end
             end

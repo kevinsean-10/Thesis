@@ -15,13 +15,11 @@ seed = 'shuffle';
 verbose = true;
 print_stat = false;
 visual_properties = struct('show_visual',true, ...
-    'save_visual', true, ...
+    'save_visual', false, ...
     'file_name', 'sdga.avi');
 
 % Define boundaries
 boundaries = repmat([-10, 10], dim, 1);
-% x1+10>=0; -x1+10>=0
-% x2+10>=0; -x2+10>=0
 
 sdgaopt = SDGA(boundaries,m_cluster,k_cluster,m,k_max, ...
                 epsilon,delta,gamma,mutation_rate,seed);

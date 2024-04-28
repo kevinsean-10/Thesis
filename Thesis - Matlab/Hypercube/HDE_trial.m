@@ -10,12 +10,12 @@ crossover_rate=0.5;
 seed = 'shuffle';
 print_stat = false;
 verbose = false;
-visual_properties = struct('show_visual',true, ...
+visual_properties = struct('show_visual',false, ...
     'save_visual', false, ...
     'file_name', 'hde.avi');
 
 % how many parts/slices do you desire in each dimension?
-parts = 100;
+parts = 200;
 
 % Define boundaries
 boundaries = repmat([-10, 10], dim, 1);

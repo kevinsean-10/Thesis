@@ -302,7 +302,7 @@ classdef HGA < handle
             end
 
             for j = 1: size(obj.final_root,1)
-                plot(obj.final_root(j,1), obj.final_root(j,2), '*',Color='magenta');
+                plot(obj.final_root(j,1), obj.final_root(j,2), '*',Color='magenta',MarkerSize=50);
                 pause(0.25)
                 if visual_properties.save_visual == true
                     frame = getframe(gcf);

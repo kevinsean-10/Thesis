@@ -1,7 +1,7 @@
 clear; clc
 
-pop_size=1000;
-max_gen=1000;
+pop_size=250;
+max_gen=250;
 F_init=0.5;
 CR_init=0.5;
 num_l=20;
@@ -12,8 +12,11 @@ print_gen=true;
 Hm = 50;
 dim = 2;
 seed = 'shuffle';
-beta = 100;
-rho = 1e-8;
+beta = 10;
+rho = 0.5;
+visual_properties = struct('show_visual',true, ...
+    'save_visual', false, ...
+    'file_name', 'raga.avi');
 
 % Define boundaries
 boundaries = repmat([-10, 10], dim, 1);
@@ -21,8 +24,59 @@ boundaries = repmat([-10, 10], dim, 1);
 % x2+10>=0; -x2+10>=0
 
 ragaopt = RAGA(boundaries,pop_size,num_l,max_gen,s_max,theta,tau_d,F_init,CR_init,Hm,beta,rho,seed);
-ragaopt.DE_evaluation(print_gen)
-ragaopt.archive
+[final_root,final_score] = ragaopt.GA_evaluation(print_gen,visual_properties)
+
+%% Exporting Statistic
+clear; clc;
+
+pop_size=250;
+max_gen=250;
+F_init=0.5;
+CR_init=0.5;
+num_l=20;
+theta=1e-3;
+tau_d=0.4;
+s_max=50;
+print_gen=false;
+Hm = 50;
+dim = 2;
+beta = 100;
+rho = 1e-8;
+visual_properties = struct('show_visual',false, ...
+    'save_visual', false, ...
+    'file_name', 'raga.avi');
+
+boundaries = repmat([-10, 10], dim, 1);
+
+max_iter = 10;
+
+disp('-start-')
+sheet1 = []; 
+sheet2 = [];
+for iter=1:max_iter
+    fprintf('Iteration: %d\n',iter)
+    tic;
+    seed = 'shuffle';
+
+    ragaopt = RAGA(boundaries,pop_size,num_l,max_gen,s_max,theta,tau_d,F_init,CR_init,Hm,beta,rho,seed);
+    [final_root,final_score] = ragaopt.GA_evaluation(print_gen,visual_properties)
+
+    elapsed_time = toc;
+
+    % 1st Sheet
+    num_iter = iter*ones(size(final_root,1),1);
+    sheet1 = [sheet1; num_iter,final_root,final_score'];
+
+    % 2nd Sheet
+    num_root = size(final_root,1);
+    best_score = min(final_score);
+    sheet2 = [sheet2; iter,num_root,best_score,elapsed_time];
+    writematrix(sheet1 ,'RAGA.xlsx',Sheet='Final Root')
+    writematrix(sheet2,'RAGA.xlsx',Sheet='Statistic')
+end
+
+disp('-end-')
+
 
 %%
 % rng(ragaopt.seed);
@@ -91,3 +145,28 @@ ragaopt.archive
 %         end
 %     end
 % end
+
+%%
+clc
+population_size = 10;
+num_per_subpopulation = 4;
+population = ragaopt.generate_points(population_size,boundaries,'shuffle')
+for i = 1:2:population_size
+    fprintf('i=%d\n',i)
+    [F_i, CR_i] = ragaopt.update_parameter();
+    x_i = population(i, :);
+    parent = zeros(2, dim); % because of one-point crossover
+
+    for j = 0:size(parent, 1)-1
+        fprintf('j=%d\n',j)
+        subpopulation_i = ragaopt.subpopulating(population(i+j, :), population, num_per_subpopulation);
+        fitness_subpopulation_i = zeros(1,num_per_subpopulation);
+        for k = 1:size(subpopulation_i,1)
+            fitness_subpopulation_i(k) = ragaopt.objective_function(subpopulation_i(k,:));
+        end
+        [selected_subpopulation,selected_indices] = ragaopt.selection(subpopulation_i,fitness_subpopulation_i);
+        [~,min_idx_parent] = min(fitness_subpopulation_i(selected_indices));
+        parent(j+1,:) = selected_subpopulation(min_idx_parent,:);
+    end
+    parent
+end
