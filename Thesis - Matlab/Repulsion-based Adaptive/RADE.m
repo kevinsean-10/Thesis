@@ -19,7 +19,10 @@ classdef RADE < handle
     end
     
     methods
-        function obj = RADE(boundaries,population_size,num_per_subpopulation,max_generation,max_archive_size,theta,tau_d,F_init,CR_init,max_memories_size,beta,rho,seed)
+        function obj = RADE(boundaries,population_size, ...
+                num_per_subpopulation,max_generation, ...
+                max_archive_size,theta,tau_d,F_init,CR_init, ...
+                max_memories_size,beta,rho,seed)
             obj.boundaries = boundaries;
             obj.dim = size(obj.boundaries,1);
             obj.population_size = population_size;
@@ -278,10 +281,6 @@ classdef RADE < handle
             
             [best_fitness, best_idx] = min(fitness);
             best = population(best_idx, :);
-            % subpop = zeros(obj.num_per_subpopulation,obj.dim,obj.population_size);
-            % for i = 1:obj.population_size
-            %     subpop(:, :, i) = obj.subpopulating(population(i, :), population, obj.num_per_subpopulation);
-            % end
             
             % Animation Saving Setting
             if visual_properties.save_visual == true
@@ -301,15 +300,16 @@ classdef RADE < handle
             end
 
             k=1;
+            updated_list = [0];
             for gen = 1:obj.max_generation
+                updated = 0;
                 if visual_properties.show_visual == true || visual_properties.save_visual == true
-                    % answ = [-6.437160, 0.155348;
-                    %         -0.932122, 1.067870;
-                    %         -0.155283, 6.439840;
-                    %          0.163333, 6.122430;
-                    %          0.667121, 0.690103;
-                    %         -6.117110, -0.163476];
-                    % % scatter(answ(:,1),answ(:,2), 50,'magenta',"LineWidth",2);
+                    answ = [-6.437160, 0.155348;
+                            -0.932122, 1.067870;
+                            -0.155283, 6.439840;
+                             0.163333, 6.122430;
+                             0.667121, 0.690103;
+                            -6.117110, -0.163476];
                     for i=1:size(XY_surf,1)
                         Z_surf(i) = obj.repulsion_function(XY_surf(i,:));
                     end
@@ -325,12 +325,13 @@ classdef RADE < handle
                     title("Tampak Atas")
 
                     subplot(2, 2, 3);
-                    surf(X_surf, Y_surf, Z_surf);
-                    view(0, -90);
-                    title("Tampak Bawah")
-
-                    hold on;
+                    plot(1:gen,updated_list,"Color",'red');
+                    title("Tingkat Disrupsi")
+                    grid on;
+                    
                     subplot(2, 2, 4);
+                    scatter(answ(:,1),answ(:,2), 50,'magenta',"LineWidth",2);
+                    hold on;
                     scatter(population(:,1), population(:,2), 5, 'filled', 'blue');    
                     hold off;
                     rectangle('Position',[obj.boundaries(:,1)',(obj.boundaries(:,2)-obj.boundaries(:,1))'],'EdgeColor','#FF0000')
@@ -341,6 +342,7 @@ classdef RADE < handle
                 for ind=1:obj.population_size
                     obj.archive = obj.update_archive(population(ind,:),obj.archive);
                 end
+                
                 S_F = [];
                 S_CR = [];
                 for i = 1:obj.population_size
@@ -358,10 +360,11 @@ classdef RADE < handle
                         population(i, :) = trial;
                         S_F = [S_F, F_i];
                         S_CR = [S_CR, CR_i];
+                        updated = updated + 1;
                         if trial_fitness < best_fitness
                             best_idx = i;
                             best = trial;
-                            best_fitness = trial_fitness
+                            best_fitness = trial_fitness;
                         end
                     end
                     if ~isempty(S_F) && ~isempty(S_CR)
@@ -398,12 +401,14 @@ classdef RADE < handle
                         writeVideo(writerObj, frame);
                     end
                 end
+                updated_list = [updated_list;updated];
             end
             final_root = obj.archive;
             final_score = zeros(1, size(final_root,1));
             for fin_iter = 1:size(final_root,1)
                 final_score(fin_iter) = obj.objective_function(final_root(fin_iter, :));
             end
+            
 
 
         end

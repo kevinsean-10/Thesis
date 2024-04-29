@@ -27,7 +27,7 @@ boundaries = repmat([-10, 10], dim, 1);
 sddeopt = SDDE(boundaries,m_cluster,k_cluster,m,k_max, ...
                 epsilon,delta,gamma,mutation_factor,crossover_rate,seed);
 
-sddeopt.DE_evaluation(verbose,print_stat,visual_properties)
+% sddeopt.DE_evaluation(verbose,print_stat,visual_properties)
 
 %% Exporting Statistic
 clear; clc;
@@ -79,3 +79,12 @@ for iter=1:max_iter
 end
 
 disp('-end-')
+
+%%
+clc
+
+tic;
+for i=1:10
+res = sddeopt.DE(boundaries,250,250,mutation_factor,crossover_rate,seed,true)
+end
+elapsed_time = toc

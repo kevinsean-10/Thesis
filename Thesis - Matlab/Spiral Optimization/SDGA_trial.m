@@ -6,7 +6,7 @@ mutation_rate=0.1;
 tau_d=0.4;
 m_cluster = 250;
 gamma = -0.2;
-epsilon = 1e-7;
+epsilon = 1e-6;
 delta = 0.01;
 k_cluster = 10;
 m = 250;
@@ -24,7 +24,7 @@ boundaries = repmat([-10, 10], dim, 1);
 sdgaopt = SDGA(boundaries,m_cluster,k_cluster,m,k_max, ...
                 epsilon,delta,gamma,mutation_rate,seed);
 
-sdgaopt.GA_evaluation(verbose,print_stat,visual_properties)
+% sdgaopt.GA_evaluation(verbose,print_stat,visual_properties)
 
 %% Exporting Statistic
 clear; clc;
@@ -76,3 +76,11 @@ for iter=1:max_iter
 end
 
 disp('-end-')
+
+%%
+
+tic;
+for i=1:10
+res = sdgaopt.GA(250,boundaries,250,mutation_rate,seed,true)
+end
+elapsed_time = toc

@@ -102,16 +102,16 @@ classdef SDDE < handle
             dv_i = obj.mutate(population, mutation_factor);
         
             % Set penalty for every donor vector that violates the boundaries
-            % for j = 1:size(dv_i, 2)
-            %     if dv_i(j) < boundaries(j, 1)
-            %         dv_i(j) = (x_i(j) + boundaries(j, 1)) / 2;
-            %     elseif dv_i(j) > boundaries(j, 2)
-            %         dv_i(j) = (x_i(j) + boundaries(j, 2)) / 2;
-            %     end
-            % end
+            for j = 1:size(dv_i, 2)
+                if dv_i(j) < boundaries(j, 1)
+                    dv_i(j) = (x_i(j) + boundaries(j, 1)) / 2;
+                elseif dv_i(j) > boundaries(j, 2)
+                    dv_i(j) = (x_i(j) + boundaries(j, 2)) / 2;
+                end
+            end
         end
 
-        function result_population = reproduction(obj,population,boundaries,mutation_factor,crossover_rate,seed)
+        function [result_population,result_fitness] = reproduction(obj,population,boundaries,mutation_factor,crossover_rate,seed)
             rng(seed); % Set random seed
             for i = 1:size(population,1)
                 x_i = population(i,:);
@@ -125,37 +125,41 @@ classdef SDDE < handle
             for i = 1:size(population,1)
                 fitness_pop(i) = obj.objective_function(population(i,:));
             end
-            [~,id_fit] = sort(fitness_pop);
+            [result_fitness,id_fit] = sort(fitness_pop);
             result_population = population(id_fit,:);
         end
             
         function [best_point, best_score] = DE(obj, boundaries,population_size,max_generation,mutation_factor,crossover_rate,seed,print_stat)
             rng(seed); % Set random seed
             population = obj.generate_points(population_size, boundaries, seed);
-            fitness = zeros(1, population_size);
-            for i = 1:population_size
-                fitness(i) = obj.objective_function(population(i, :));
-            end
-            [best_score, best_idx] = min(fitness);
-            best_point = population(best_idx,:);
+            % fitness = zeros(1, population_size);
+            % for i = 1:population_size
+            %     fitness(i) = obj.objective_function(population(i, :));
+            % end
+            % [best_score, best_idx] = min(fitness);
+            % best_point = population(best_idx,:);
 
             for gen = 1:max_generation
-                for i = 1:population_size
-                    x_i = population(i,:);
-                    dv_i = obj.mutation_penalty(x_i, population, boundaries, mutation_factor,i);
-                    trial = obj.crossover(x_i, dv_i, crossover_rate);
-                    trial_fitness = obj.objective_function(trial);
+                [population,fitness] = obj.reproduction(population,boundaries,mutation_factor,crossover_rate,seed);
+                [best_score, best_idx] = min(fitness);
+                best_point = population(best_idx, :);
+                % for i = 1:population_size
+                %     x_i = population(i,:);
+                %     dv_i = obj.mutation_penalty(x_i, population, boundaries, mutation_factor,i);
+                %     trial = obj.crossover(x_i, dv_i, crossover_rate);
+                %     trial_fitness = obj.objective_function(trial);
+                % 
+                %     if trial_fitness <= fitness(i)
+                %         fitness(i) = trial_fitness;
+                %         population(i,:) = trial;
+                %         if trial_fitness < fitness(best_idx)
+                %             best_idx = i;
+                %             best_point = trial;
+                %             best_score = fitness(best_idx);
+                %         end
+                %     end
+                % end
 
-                    if trial_fitness <= fitness(i)
-                        fitness(i) = trial_fitness;
-                        population(i,:) = trial;
-                        if trial_fitness < fitness(best_idx)
-                            best_idx = i;
-                            best_point = trial;
-                            best_score = fitness(best_idx);
-                        end
-                    end
-                end
 
                 if print_stat
                     fprintf("=========Generation %d=========\n", gen);
@@ -193,10 +197,10 @@ classdef SDDE < handle
 
             if (Fxt > Fy) && (Fxt > Fxc)
                 obj.cluster_center = [obj.cluster_center; y];
-                obj.cluster_radius = [obj.cluster_radius; norm((y - xt),2)];
+                obj.cluster_radius = [obj.cluster_radius; norm(y - xt)];
             elseif (Fxt < Fy) && (Fxt < Fxc)
                 obj.cluster_center = [obj.cluster_center; y];
-                obj.cluster_radius = [obj.cluster_radius; norm((y - xt),2)];
+                obj.cluster_radius = [obj.cluster_radius; norm(y - xt)];
                 obj.function_cluster(xt);
             elseif Fy < Fxc
                 obj.cluster_center(min_dist_id, :) = y;
@@ -263,7 +267,7 @@ classdef SDDE < handle
                     end
                 end
 
-                obj.cluster_iter_points = obj.reproduction(obj.cluster_iter_points, ...
+                [obj.cluster_iter_points,~] = obj.reproduction(obj.cluster_iter_points, ...
                     obj.boundaries,obj.mutation_factor,obj.crossover_rate,obj.seed);
             
                 k = k + 1;

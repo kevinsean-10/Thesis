@@ -9,7 +9,7 @@ mutation_factor=0.1;
 crossover_rate=0.5;
 seed = 'shuffle';
 print_stat = false;
-verbose = false;
+verbose = true;
 visual_properties = struct('show_visual',false, ...
     'save_visual', false, ...
     'file_name', 'hde.avi');

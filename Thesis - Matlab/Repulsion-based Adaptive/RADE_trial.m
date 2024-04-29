@@ -5,16 +5,16 @@ pop_size=250;
 max_gen=250;
 F_init=0.5;
 CR_init=0.5;
-num_l=20;
-theta=1e-3;
+num_l=10;
+theta=1e-7;
 tau_d=0.4;
 s_max=20;
 print_gen=true;
 Hm = 50;
 dim = 2;
 seed = 'shuffle';
-beta = 10;
-rho = 0.5;
+beta = 1;
+rho = 0.3;
 visual_properties = struct('show_visual',true, ...
                             'save_visual', false, ...
                             'file_name', 'rade3d.avi');

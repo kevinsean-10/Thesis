@@ -53,7 +53,7 @@ classdef RAGA < handle
             res = -1 / (1 + res);
             obj.criterion = -1 + obj.theta;
         end
-
+        
         % function res = objective_function(obj,x)
         %     res = 0;
         %     F_array = obj.system_equations(x);
@@ -106,10 +106,14 @@ classdef RAGA < handle
 
         function [selected_population,selected_indices] = selection(obj, population, fitness)
             pop_size = size(population, 1);
-            selection_probs = 1 ./ (fitness+1); % Make sure no division by zero
-            total_probs = sum(selection_probs);
-            selection_probs = selection_probs / total_probs;
-            selected_indices = randsample(1:pop_size, pop_size, true, selection_probs);
+            % selection_probs = 1 ./ (fitness+1); % Make sure no division by zero
+            % total_probs = sum(selection_probs);
+            % selection_probs = selection_probs / total_probs;
+            mean_fitness = mean(fitness);
+            std_fitness = std(fitness);
+            normalized_fitness = (fitness-mean_fitness)/std_fitness;
+            probability_distribution = normcdf(-normalized_fitness,mean_fitness,std_fitness);
+            selected_indices = randsample(1:pop_size, pop_size, true, probability_distribution);
             selected_population = population(selected_indices, :);
         end
 
@@ -258,17 +262,17 @@ classdef RAGA < handle
         end
 
         function update_history(obj, S_F, S_CR, k)
-            weights = ones(1, numel(S_F));
-            if ~isempty(S_F)
-                obj.memories_F(k) = obj.meanWL(S_F, weights);
-            end
-            if ~isempty(S_CR)
-                obj.memories_CR(k) = obj.meanWA(S_CR, weights);
-            end
+            % weights = ones(1, numel(S_F));
+            % if ~isempty(S_F)
+            %     obj.memories_F(k) = obj.meanWL(S_F, weights);
+            % end
+            % if ~isempty(S_CR)
+            %     obj.memories_CR(k) = obj.meanWA(S_CR, weights);
+            % end
         end
 
         function [final_root,final_score] = GA_evaluation(obj,verbose,visual_properties)
-            rng(obj.seed);
+            % rng(obj.seed);
             population = obj.generate_points(obj.population_size,obj.boundaries,obj.seed);
             
             fitness = zeros(1, obj.population_size);
@@ -277,10 +281,6 @@ classdef RAGA < handle
             end
             [best_fitness, best_idx] = min(fitness);
             best = population(best_idx, :);
-            % subpopulation = zeros(obj.num_per_subpopulation,obj.dim,obj.population_size);
-            % for i = 1:obj.population_size
-            %     subpopulation(:, :, i) = obj.subpopulating(population(i, :), population, obj.num_per_subpopulation);
-            % end
             
             % Animation Saving Setting
             if visual_properties.save_visual == true
@@ -298,10 +298,10 @@ classdef RAGA < handle
                 XY_surf = [X_surf(:),Y_surf(:)];
                 Z_surf = zeros(size(XY_surf,1),1);
             end
-
+            updated_list = [0];
             memory_id=1;
-            
             for gen = 1:obj.max_generation 
+                updated = 0;
                 if visual_properties.show_visual == true || visual_properties.save_visual == true
                     answ = [-6.437160, 0.155348;
                             -0.932122, 1.067870;
@@ -325,12 +325,12 @@ classdef RAGA < handle
                     title("Tampak Atas")
 
                     subplot(2, 2, 3);
-                    surf(X_surf, Y_surf, Z_surf);
-                    view(0, -90);
-                    title("Tampak Bawah")
+                    plot(1:gen,updated_list,"Color",'red');
+                    title("Tingkat Disrupsi")
+                    grid on;
 
                     subplot(2, 2, 4);
-                    scatter(answ(:,1),answ(:,2), 50,'magenta',"LineWidth",2);
+                    scatter(answ(:,1),answ(:,2), 25,'magenta');
                     hold on;
                     scatter(population(:,1), population(:,2), 5, 'filled', 'blue');    
                     hold off;
@@ -338,25 +338,28 @@ classdef RAGA < handle
                     xlim(0.5*obj.boundaries(1,:));
                     ylim(0.5*obj.boundaries(2,:));
                 end
+
                 for ind=1:obj.population_size
                     obj.archive = obj.update_archive(population(ind,:),obj.archive);
                 end
+
                 S_F = [];
                 S_CR = [];
                 for i = 1:2:obj.population_size
                     [F_i, CR_i] = obj.update_parameter();
                     x_i = population(i, :);
                     parent = zeros(2, obj.dim); % because of one-point crossover
-                
+
                     for j = 0:size(parent, 1)-1
                         subpopulation_i = obj.subpopulating(population(i+j, :), population, obj.num_per_subpopulation);
                         fitness_subpopulation_i = zeros(1,obj.num_per_subpopulation);
                         for k = 1:size(subpopulation_i,1)
                             fitness_subpopulation_i(k) = obj.objective_function(subpopulation_i(k,:));
                         end
-                        [selected_subpopulation,selected_indices] = obj.selection(subpopulation_i,fitness_subpopulation_i);
-                        [~,min_idx_parent] = min(fitness_subpopulation_i(selected_indices));
-                        parent(j+1,:) = selected_subpopulation(min_idx_parent,:);
+                        [selected_subpopulation,~] = obj.selection(subpopulation_i,fitness_subpopulation_i);
+                        % random_id = randperm(size(selected_subpopulation,1),1);
+                        % [~,min_idx_parent] = min(fitness_subpopulation_i(selected_indices));
+                        parent(j+1,:) = selected_subpopulation(1,:);
                     end
                     offspring_set = obj.crossover(parent(1,:),parent(2,:));
                    
@@ -370,10 +373,11 @@ classdef RAGA < handle
                             population(id_closest_trial,:) = trial;
                             S_F = [S_F, F_i];
                             S_CR = [S_CR, CR_i];
+                            updated = updated + 1;
                             if trial_fitness < best_fitness
                                 best_idx = i;
                                 best = trial;
-                                best_fitness = trial_fitness
+                                best_fitness = trial_fitness;
                             end
                         end
                     end
@@ -409,7 +413,8 @@ classdef RAGA < handle
                         frame = getframe(gcf);
                         writeVideo(writerObj, frame);
                     end
-                end
+                end              
+                updated_list = [updated_list;updated];
             end
             final_root = obj.archive;
             final_score = zeros(1, size(final_root,1));

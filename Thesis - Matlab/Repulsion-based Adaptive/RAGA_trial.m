@@ -1,19 +1,19 @@
 clear; clc
 
-pop_size=250;
+pop_size=1000;
 max_gen=250;
 F_init=0.5;
 CR_init=0.5;
-num_l=20;
+num_l=10;
 theta=1e-3;
 tau_d=0.4;
 s_max=50;
 print_gen=true;
-Hm = 50;
+Hm = 100;
 dim = 2;
 seed = 'shuffle';
-beta = 10;
-rho = 0.5;
+beta = 1;
+rho = 0.3;
 visual_properties = struct('show_visual',true, ...
     'save_visual', false, ...
     'file_name', 'raga.avi');
@@ -170,3 +170,35 @@ for i = 1:2:population_size
     end
     parent
 end
+
+%%
+clc
+% Example vector
+v = -rand(1,3)
+
+% Calculate the mean and standard deviation of the vector
+mean_v = mean(v);
+std_v = std(v);
+
+% Normalize the vector
+normalized_v = (v - mean_v) / std_v
+probability_distribution = normcdf(-normalized_v, mean_v, std_v)
+
+
+%%
+clc
+% Example normalized vector
+normalized_v = [-0.5, 0.2, -0.8];
+
+% Define parameters for the normal distribution
+mu = 0; % Mean of the distribution
+sigma = 1; % Standard deviation of the distribution
+
+% Compute the cumulative distribution function (CDF) of the normal distribution
+% Note: Use the negative of the normalized value because we want higher probabilities for more negative values
+probability_distribution = normcdf(-normalized_v, mu, sigma);
+
+% Display the resulting probability distribution
+disp('Probability distribution:');
+disp(probability_distribution);
+

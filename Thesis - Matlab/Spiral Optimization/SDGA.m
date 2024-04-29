@@ -96,7 +96,6 @@ classdef SDGA < handle
             
         function [best_individual, best_fitness] = GA(obj, population_size, boundaries, max_generation, mutation_rate, seed, print_stat)
             rng(seed);
-            dimension = size(boundaries, 2);
             population = obj.generate_points(population_size, boundaries, seed);
             fitness = zeros(1, population_size);
             for i = 1:population_size
@@ -116,12 +115,8 @@ classdef SDGA < handle
                 [best_fitness, best_idx] = min(fitness);
                 best_individual = population(best_idx, :);
                 if print_stat == true
-                    disp("=========Generation " + generation + "=========");
-                    disp("Best Individual: ");
-                    disp(best_individual);
-                    disp("Best Score: ");
-                    disp(best_fitness);
-                    disp(" ");
+                    fprintf("=========Generation %d=========\n", generation);
+                    fprintf("Best Individual: %s with score %.4f\n", mat2str(best_individual), best_fitness);
                 end
             end
         end
