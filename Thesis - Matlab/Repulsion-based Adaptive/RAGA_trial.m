@@ -1,7 +1,7 @@
 clear; clc
 
-pop_size=1000;
-max_gen=250;
+pop_size=250;
+max_gen=100;
 F_init=0.5;
 CR_init=0.5;
 num_l=10;

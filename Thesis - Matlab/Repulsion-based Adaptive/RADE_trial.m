@@ -1,13 +1,13 @@
 %% Trial
 clear; clc
 
-pop_size=250;
-max_gen=250;
+pop_size=1000;
+max_gen=300;
 F_init=0.5;
 CR_init=0.5;
 num_l=10;
-theta=1e-7;
-tau_d=0.4;
+theta=1e-3;
+tau_d=0.5;
 s_max=20;
 print_gen=true;
 Hm = 50;
@@ -20,9 +20,8 @@ visual_properties = struct('show_visual',true, ...
                             'file_name', 'rade3d.avi');
 
 % Define boundaries
-boundaries = repmat([-10, 10], dim, 1);
-% x1+10>=0; -x1+10>=0
-% x2+10>=0; -x2+10>=0
+% boundaries = repmat([-10, 10], dim, 1);
+boundaries = [-1,3;-17,4];
 
 radeopt = RADE(boundaries,pop_size,num_l,max_gen,s_max,theta,tau_d,F_init,CR_init,Hm,beta,rho,seed);
 
@@ -39,7 +38,7 @@ max_gen=250;
 F_init=0.5;
 CR_init=0.5;
 num_l=20;
-theta=1e-3;
+theta=1e-6;
 tau_d=0.4;
 s_max=20;
 print_gen=false;
@@ -64,9 +63,14 @@ for iter=1:max_iter
 
     radeopt = RADE(boundaries,pop_size,num_l,max_gen,s_max,theta,tau_d,F_init,CR_init,Hm,beta,rho,seed);
     [final_root,final_score] = radeopt.DE_evaluation(print_gen,visual_properties);
+    
+    if isempty(final_root)
+        final_root = NaN(1,dim);
+        final_score = NaN;
+    end
 
     elapsed_time = toc;
-
+    
     % 1st Sheet
     num_iter = iter*ones(size(final_root,1),1);
     sheet1 = [sheet1; num_iter,final_root,final_score'];

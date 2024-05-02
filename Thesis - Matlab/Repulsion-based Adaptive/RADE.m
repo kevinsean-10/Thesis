@@ -41,9 +41,15 @@ classdef RADE < handle
             obj.seed = seed;
         end
 
+        % function F_array = system_equations(obj,x)
+        %     f1 = exp(x(1)-x(2)) - sin(x(1)+x(2));
+        %     f2 = (x(1)*x(2))^2 - cos(x(1)+x(2));
+        %     F_array = [f1; f2];
+        % end
+
         function F_array = system_equations(obj,x)
-            f1 = exp(x(1)-x(2)) - sin(x(1)+x(2));
-            f2 = (x(1)*x(2))^2 - cos(x(1)+x(2));
+            f1 = 0.5 * sin(x(1) * x(2)) - 0.25 * x(2) / pi - 0.5 * x(1);
+            f2 = (1 - 0.25 / pi) * (exp(2 * x(1)) - exp(1)) + exp(1) * x(2) / pi - 2 * exp(1) * x(1);
             F_array = [f1; f2];
         end
 
@@ -215,6 +221,16 @@ classdef RADE < handle
                 end
             end
         end
+
+        function Fi = update_Fi(obj,hi)
+            a = rand();
+            Fi = 0.1*tan(pi * (a - 0.5)) + obj.memories_F(hi);
+            if Fi > 1
+                Fi = 1;
+            elseif Fi <=0
+                Fi = obj.update_Fi(hi);
+            end
+        end
         
         function [Fi, CRi] = update_parameter(obj)
             % OUTPUT
@@ -224,13 +240,14 @@ classdef RADE < handle
             % Randomly select an index
             hi = randi(obj.max_memories_size);
             % Generate Fi using the Cauchy distribution with the location parameter MF(hi) and scale 0.1
-            % Fi = tan(pi * (rand - 0.5)) + obj.memories_F(hi)
-            Fi = obj.memories_F(hi) + 0.1*trnd(1,1);
+            Fi = obj.update_Fi(hi);
+            % Fi = obj.memories_F(hi) + 0.1*trnd(1,1);
             % Generate CRi using the Gaussian distribution with mean MCR(hi) and standard deviation 0.1
             CRi = normrnd(obj.memories_CR(hi), 0.1);
             % Ensure CRi is within the range [0, 1] and Fi is within the range [0,2]
-            Fi = min(max(Fi, 0), 1);
+            % Fi = min(max(Fi, 0), 1);
             CRi = min(max(CRi, 0), 1);
+
         end
 
         function result = meanWL(obj, elements, weights)
@@ -301,43 +318,10 @@ classdef RADE < handle
 
             k=1;
             updated_list = [0];
+            memoriesF = [];
+            memoriesCR = [];
             for gen = 1:obj.max_generation
                 updated = 0;
-                if visual_properties.show_visual == true || visual_properties.save_visual == true
-                    answ = [-6.437160, 0.155348;
-                            -0.932122, 1.067870;
-                            -0.155283, 6.439840;
-                             0.163333, 6.122430;
-                             0.667121, 0.690103;
-                            -6.117110, -0.163476];
-                    for i=1:size(XY_surf,1)
-                        Z_surf(i) = obj.repulsion_function(XY_surf(i,:));
-                    end
-                    Z_surf = reshape(Z_surf, size(X_surf));
-                    subplot(2, 2, 1);
-                    surf(X_surf, Y_surf, Z_surf);
-                    view(0, 0);
-                    title("Tampak Samping")
-
-                    subplot(2, 2, 2);
-                    surf(X_surf, Y_surf, Z_surf);
-                    view(0, 90);
-                    title("Tampak Atas")
-
-                    subplot(2, 2, 3);
-                    plot(1:gen,updated_list,"Color",'red');
-                    title("Tingkat Disrupsi")
-                    grid on;
-                    
-                    subplot(2, 2, 4);
-                    scatter(answ(:,1),answ(:,2), 50,'magenta',"LineWidth",2);
-                    hold on;
-                    scatter(population(:,1), population(:,2), 5, 'filled', 'blue');    
-                    hold off;
-                    rectangle('Position',[obj.boundaries(:,1)',(obj.boundaries(:,2)-obj.boundaries(:,1))'],'EdgeColor','#FF0000')
-                    xlim(obj.boundaries(1,:));
-                    ylim(obj.boundaries(2,:));
-                end
                     
                 for ind=1:obj.population_size
                     obj.archive = obj.update_archive(population(ind,:),obj.archive);
@@ -376,10 +360,55 @@ classdef RADE < handle
                     end
 
                 end
+
                 if verbose
                     fprintf("=========Generation %d=========\n", gen);
                     disp("Archive:");
                     disp(obj.archive);
+                end
+
+                if visual_properties.show_visual == true || visual_properties.save_visual == true
+                    xlim(obj.boundaries(1,:));
+                    ylim(obj.boundaries(2,:));
+                    % answ = [-6.437160, 0.155348;
+                    %         -0.932122, 1.067870;
+                    %         -0.155283, 6.439840;
+                    %          0.163333, 6.122430;
+                    %          0.667121, 0.690103;
+                    %         -6.117110, -0.163476];
+                    for i=1:size(XY_surf,1)
+                        Z_surf(i) = obj.repulsion_function(XY_surf(i,:));
+                    end
+                    Z_surf = reshape(Z_surf, size(X_surf));
+                    subplot(2, 2, 1);
+                    surf(X_surf, Y_surf, Z_surf);
+                    view(0, 0);
+                    title("Tampak Samping")
+
+                    subplot(2, 2, 2);
+                    memoriesF = [memoriesF,obj.memories_F(k)];
+                    memoriesCR = [memoriesCR,obj.memories_CR(k)];
+                    hold on
+                    plot(0:gen-1,memoriesF,'Color','magenta')
+                    plot(0:gen-1,memoriesCR,'Color','green')
+                    legend(["F",'CR'], 'Location', 'southwest')
+                    hold off
+                    ylim([0,1])
+                    title("Parameter F dan CR")
+                    grid on;
+
+                    subplot(2, 2, 3);
+                    plot(0:gen-1,updated_list,"Color",'red');
+                    title("Tingkat Disrupsi")
+                    grid on;
+                    
+                    subplot(2, 2, 4);
+                    % scatter(answ(:,1),answ(:,2), 50,"MarkerEdgeColor","#EDB120","LineWidth",2);
+                    % hold on;
+                    scatter(population(:,1), population(:,2), 5, 'filled', 'blue');    
+                    % hold off;
+                    rectangle('Position',[obj.boundaries(:,1)',(obj.boundaries(:,2)-obj.boundaries(:,1))'],'EdgeColor','#FF0000')
+                    grid on;
                 end
 
                 if visual_properties.show_visual == true || visual_properties.save_visual == true
@@ -391,7 +420,7 @@ classdef RADE < handle
                     set(gcf, 'WindowState', 'maximized');
                     if ~isempty(obj.archive)
                         hold on
-                        plot(obj.archive(:,1), obj.archive(:,2),'*',Color='magenta',MarkerSize=50);
+                        plot(obj.archive(:,1), obj.archive(:,2),'*',Color='#EDB120',MarkerSize=50);
                         hold off
                     end
                     title(sprintf("Generation %d",gen))
@@ -401,6 +430,7 @@ classdef RADE < handle
                         writeVideo(writerObj, frame);
                     end
                 end
+
                 updated_list = [updated_list;updated];
             end
             final_root = obj.archive;

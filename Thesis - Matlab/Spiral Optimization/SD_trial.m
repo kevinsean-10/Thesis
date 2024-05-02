@@ -63,6 +63,11 @@ for iter=1:max_iter
     spiropt = SD(boundaries,m_cluster,k_cluster,m,k_max,epsilon,delta,gamma,theta,r,seed);
     [final_root,final_score] = spiropt.spiral_opt_evaluation(verbose,visual_properties);
 
+    if isempty(final_root)
+        final_root = NaN(1,dim);
+        final_score = NaN;
+    end
+
     elapsed_time = toc;
 
     % 1st Sheet

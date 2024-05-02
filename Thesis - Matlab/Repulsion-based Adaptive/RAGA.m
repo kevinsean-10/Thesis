@@ -127,8 +127,10 @@ classdef RAGA < handle
 
         function individual = mutate(obj, individual, mutation_rate, boundaries)
             for j = 1:length(individual)
-                if rand() < mutation_rate
-                    individual(j) = rand() * (boundaries(j, 2) - boundaries(j, 1)) + boundaries(j, 1);
+                a = rand();
+                b = rand();
+                if a < mutation_rate
+                    individual(j) = b * (boundaries(j, 2) - boundaries(j, 1)) + boundaries(j, 1);
                 end
             end
         end
@@ -217,6 +219,16 @@ classdef RAGA < handle
             end
         end
 
+        function Fi = update_Fi(obj,hi)
+            a = rand();
+            Fi = 0.1*tan(pi * (a - 0.5)) + obj.memories_F(hi);
+            if Fi > 1
+                Fi = 1;
+            elseif Fi <=0
+                Fi = obj.update_Fi(hi);
+            end
+        end
+        
         function [Fi, CRi] = update_parameter(obj)
             % OUTPUT
             % Fi: scaling factor
@@ -225,13 +237,14 @@ classdef RAGA < handle
             % Randomly select an index
             hi = randi(obj.max_memories_size);
             % Generate Fi using the Cauchy distribution with the location parameter MF(hi) and scale 0.1
-            % Fi = tan(pi * (rand - 0.5)) + obj.memories_F(hi)
-            Fi = obj.memories_F(hi) + 0.1*trnd(1,1);
+            Fi = obj.update_Fi(hi);
+            % Fi = obj.memories_F(hi) + 0.1*trnd(1,1);
             % Generate CRi using the Gaussian distribution with mean MCR(hi) and standard deviation 0.1
             CRi = normrnd(obj.memories_CR(hi), 0.1);
             % Ensure CRi is within the range [0, 1] and Fi is within the range [0,2]
-            Fi = min(max(Fi, 0), 1);
+            % Fi = min(max(Fi, 0), 1);
             CRi = min(max(CRi, 0), 1);
+
         end
 
         function result = meanWL(obj, elements, weights)
@@ -262,13 +275,13 @@ classdef RAGA < handle
         end
 
         function update_history(obj, S_F, S_CR, k)
-            % weights = ones(1, numel(S_F));
-            % if ~isempty(S_F)
-            %     obj.memories_F(k) = obj.meanWL(S_F, weights);
-            % end
-            % if ~isempty(S_CR)
-            %     obj.memories_CR(k) = obj.meanWA(S_CR, weights);
-            % end
+            weights = ones(1, numel(S_F));
+            if ~isempty(S_F)
+                obj.memories_F(k) = obj.meanWL(S_F, weights);
+            end
+            if ~isempty(S_CR)
+                obj.memories_CR(k) = obj.meanWA(S_CR, weights);
+            end
         end
 
         function [final_root,final_score] = GA_evaluation(obj,verbose,visual_properties)
@@ -299,46 +312,11 @@ classdef RAGA < handle
                 Z_surf = zeros(size(XY_surf,1),1);
             end
             updated_list = [0];
+            memoriesF = [];
+
             memory_id=1;
             for gen = 1:obj.max_generation 
                 updated = 0;
-                if visual_properties.show_visual == true || visual_properties.save_visual == true
-                    answ = [-6.437160, 0.155348;
-                            -0.932122, 1.067870;
-                            -0.155283, 6.439840;
-                             0.163333, 6.122430;
-                             0.667121, 0.690103;
-                            -6.117110, -0.163476];
-                    
-                    for i=1:size(XY_surf,1)
-                        Z_surf(i) = obj.repulsion_function(XY_surf(i,:));
-                    end
-                    Z_surf = reshape(Z_surf, size(X_surf));
-                    subplot(2, 2, 1);
-                    surf(X_surf, Y_surf, Z_surf);
-                    view(0, 0);
-                    title("Tampak Samping")
-
-                    subplot(2, 2, 2);
-                    surf(X_surf, Y_surf, Z_surf);
-                    view(0, 90);
-                    title("Tampak Atas")
-
-                    subplot(2, 2, 3);
-                    plot(1:gen,updated_list,"Color",'red');
-                    title("Tingkat Disrupsi")
-                    grid on;
-
-                    subplot(2, 2, 4);
-                    scatter(answ(:,1),answ(:,2), 25,'magenta');
-                    hold on;
-                    scatter(population(:,1), population(:,2), 5, 'filled', 'blue');    
-                    hold off;
-                    rectangle('Position',[obj.boundaries(:,1)',(obj.boundaries(:,2)-obj.boundaries(:,1))'],'EdgeColor','#FF0000')
-                    xlim(0.5*obj.boundaries(1,:));
-                    ylim(0.5*obj.boundaries(2,:));
-                end
-
                 for ind=1:obj.population_size
                     obj.archive = obj.update_archive(population(ind,:),obj.archive);
                 end
@@ -381,6 +359,7 @@ classdef RAGA < handle
                             end
                         end
                     end
+
                     if ~isempty(S_F) && ~isempty(S_CR)
                         obj.update_history(S_F, S_CR, memory_id);
                         memory_id = memory_id + 1;
@@ -393,6 +372,49 @@ classdef RAGA < handle
                     fprintf("=========Generation %d=========\n", gen);
                     disp("Archive:");
                     disp(obj.archive);
+                end
+
+                if visual_properties.show_visual == true || visual_properties.save_visual == true
+                    answ = [-6.437160, 0.155348;
+                            -0.932122, 1.067870;
+                            -0.155283, 6.439840;
+                             0.163333, 6.122430;
+                             0.667121, 0.690103;
+                            -6.117110, -0.163476];
+                    
+                    for i=1:size(XY_surf,1)
+                        Z_surf(i) = obj.repulsion_function(XY_surf(i,:));
+                    end
+                    Z_surf = reshape(Z_surf, size(X_surf));
+                    subplot(2, 2, 1);
+                    surf(X_surf, Y_surf, Z_surf);
+                    view(0, 0);
+                    % zlim([-10,10])
+                    title("Tampak Samping")
+
+                    subplot(2, 2, 2);
+                    memoriesF = [memoriesF,obj.memories_F(k)];
+                    hold on
+                    plot(0:gen-1,memoriesF,'Color','magenta')
+                    ylim([0,1])
+                    legend(["F"], 'Location', 'southwest')
+                    hold off
+                    title("Parameter F")
+                    grid on;
+
+                    subplot(2, 2, 3);
+                    plot(1:gen,updated_list,"Color",'red');
+                    title("Tingkat Disrupsi")
+                    grid on;
+
+                    subplot(2, 2, 4);
+                    scatter(answ(:,1),answ(:,2), 25,'magenta');
+                    hold on;
+                    scatter(population(:,1), population(:,2), 5, 'filled', 'blue');    
+                    hold off;
+                    rectangle('Position',[obj.boundaries(:,1)',(obj.boundaries(:,2)-obj.boundaries(:,1))'],'EdgeColor','#FF0000')
+                    xlim(0.5*obj.boundaries(1,:));
+                    ylim(0.5*obj.boundaries(2,:));
                 end
 
                 if visual_properties.show_visual == true || visual_properties.save_visual == true
