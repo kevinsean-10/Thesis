@@ -1,9 +1,9 @@
 %% Trial
-clear; clc;
+clear; clc; close all;
 
 dim = 2;
 mutation_factor=0.8;
-crossover_rate=0.2;
+crossover_rate=0.1;
 tau_d=0.4;
 m_cluster = 250;
 gamma = -0.2;
@@ -27,7 +27,16 @@ boundaries = repmat([-10, 10], dim, 1);
 sddeopt = SDDE(boundaries,m_cluster,k_cluster,m,k_max, ...
                 epsilon,delta,gamma,mutation_factor,crossover_rate,seed);
 
-sddeopt.DE_evaluation(verbose,print_stat,visual_properties)
+% sddeopt.initialization();
+% sddeopt.cluster_center
+% sddeopt.cluster_radius
+% pop = sddeopt.cluster_iter_points
+% sddeopt.cluster_iter_bestsol
+% 
+% sddeopt.clustering(visual_properties);
+
+[final_root,final_score] = sddeopt.DE_evaluation(verbose, print_stat,visual_properties)
+
 
 %% Exporting Statistic
 clear; clc;

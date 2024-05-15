@@ -1,13 +1,13 @@
 %% Trial
 clear; clc
 
-pop_size=250;
-max_gen=250;
+pop_size=2000;
+max_gen=300;
 F_init=0.5;
 CR_init=0.5;
 num_l=10;
 theta=1e-6;
-tau_d=0.4;
+tau_d=0.3;
 s_max=20;
 print_gen=true;
 Hm = 50;
@@ -23,12 +23,12 @@ us = '_';
 extension = '.avi';
 
 visual_properties = struct('show_visual',true, ...
-                            'save_visual', true, ...
+                            'save_visual', false, ...
                             'file_name', [basename,us,num2str(pop_size),us,num2str(max_gen),us,num2str(rngseed.Seed),extension]);
 
 % Define boundaries
-boundaries = repmat([-10, 10], dim, 1);
-% boundaries = [-1,3;-17,4];
+% boundaries = repmat([-10, 10], dim, 1);
+boundaries = [-1,3;-17,4];
 
 radeopt = RADE(boundaries,pop_size,num_l,max_gen,s_max,theta,tau_d,F_init,CR_init,Hm,beta,rho,seed);
 
@@ -41,11 +41,11 @@ close;
 %% Exporting Statistic
 clear; clc;
 
-pop_size=[10,20,30];
-max_gen=[10,20,30];
+pop_size=[250];
+max_gen=[50,100,250];
 F_init=0.5;
 CR_init=0.5;
-num_l=20;
+num_l=10;
 theta=1e-6;
 tau_d=0.4;
 s_max=20;
@@ -57,7 +57,7 @@ rho = 0.01;
 
 boundaries = repmat([-10, 10], dim, 1);
 
-max_iter = 10;
+max_iter = 100;
 
 basename = 'rade';
 us = '_';
@@ -70,6 +70,8 @@ sheet2 = [];
 sheet3 = [];
 for ps = 1: size(pop_size,2)
     for mg = 1: size(max_gen,2)
+        disp("----------")
+        fprintf('pop_size=%d\nmax_gen=%d\n',pop_size(ps),max_gen(mg))
         for iter=1:max_iter
             fprintf('Iteration: %d\n',iter)
             seed = 'shuffle';
