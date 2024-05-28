@@ -4,6 +4,7 @@ classdef SDDE < handle
         dim
         seed
         epsilon
+        criterion
         gamma
         delta
         m_cluster
@@ -15,6 +16,7 @@ classdef SDDE < handle
         cluster_radius
         cluster_center
         cluster_iter_points
+        cluster_iter_bestsol
     end
     
     methods
@@ -27,6 +29,7 @@ classdef SDDE < handle
             obj.m = m;
             obj.k_max = k_max;
             obj.epsilon = epsilon;
+            obj.criterion = epsilon;
             obj.delta = delta;
             obj.gamma = gamma;
             obj.mutation_factor = mutation_factor;
@@ -35,154 +38,157 @@ classdef SDDE < handle
             obj = initialization(obj);
         end
 
+        % % Problem 1
+        % function F_array = system_equations(obj,x)
+        %     f1 = exp(x(1)-x(2)) - sin(x(1)+x(2));
+        %     f2 = (x(1)*x(2))^2 - cos(x(1)+x(2));
+        %     F_array = [f1; f2];
+        % end
+
+        % % Problem 2
+        % function F_array = system_equations(obj,x)
+        %     f1 = 0.5 * sin(x(1) * x(2)) - 0.25 * x(2) / pi - 0.5 * x(1);
+        %     f2 = (1 - 0.25 / pi) * (exp(2 * x(1)) - exp(1)) + exp(1) * x(2) / pi - 2 * exp(1) * x(1);
+        %     F_array = [f1; f2];
+        % end
+
+        % % Problem 4
+        % function F_array = system_equations(obj,x)
+        %     % g1 = x(1)*x(2)^3 / 12 - (x(1) - 2*x(3))*(x(2) - 2*x(3))^3 / 12 - 9369;
+        %     % g2 = 2*(x(2) - x(3))^2 * (x(1) - x(3))^2 * x(3) / (x(2) + x(1) - 2*x(3)) - 6835;
+        %     f1 = x(1)*x(2) - (x(1) - 2*x(3))*(x(2) - 2*x(3)) - 165;
+        %     f2 = x(1)*x(2)^3 / 12 - (x(1) - 2*x(3))*(x(2) - 2*x(3))^3 / 12 - 9369;
+        %     f3 = (2*((x(2)-x(3))^2)*((x(1)-x(3))^2)*x(3))/(x(2)+x(1)-2*x(3)) - 6835;
+        %     F_array = [f1; f2; f3];
+        % end
+
+        % % Problem 5
+        % function F_array = system_equations(obj,x)
+        %     f1 = 2*x(1) + x(2) + x(3) + x(4) + x(5) - 6;
+        %     f2 = x(1) + 2*x(2) + x(3) + x(4) + x(5) - 6;
+        %     f3 = x(1) + x(2) + 2*x(3) + x(4) + x(5) - 6;
+        %     f4 = x(1) + x(2) + x(3) + 2*x(4) + x(5) - 6;
+        %     f5 = x(1)*x(2)*x(3)*x(4)*x(5) - 1;
+        %     F_array = [f1; f2;f3;f4;f5];
+        % end
+
+        % Problem 7
         function F_array = system_equations(obj,x)
-            f1 = exp(x(1)-x(2)) - sin(x(1)+x(2));
-            f2 = (x(1)*x(2))^2 - cos(x(1)+x(2));
-            F_array = [f1; f2];
+            f1 = x(1)^2-x(1)-x(2)^2-x(2)+x(3)^2;
+            f2 = sin(x(2)-exp(x(1)));
+            f3 = x(3)-log(abs(x(2)));
+            F_array = [f1; f2; f3];
         end
 
         function res = objective_function(obj, x)
             F_array = obj.system_equations(x);
             res = sum(abs(F_array));
             res = -1 / (1 + res);
+            obj.criterion = -1 + obj.epsilon;
         end
 
-        function points = generate_points(obj,npoint,boundaries,seed)
+        function [pop,BestSol] = generate_points(obj,npoint,boundaries,seed)
             rng(seed)
             dimension = size(boundaries,1);
             p = sobolset(dimension);
             p = scramble(p,'MatousekAffineOwen');
             A = net(p,npoint);
-            points = zeros(npoint,dimension);
-            for i=1:dimension
-               points(:,i)=round((boundaries(i,1)+(boundaries(i,2)-boundaries(i,1)).*A(:,i))*100)/100;
-            end
-        end
-
-        function mutant = mutate(obj, population, F)
-            % Mutation function for DE
-            % Vectorized mutation operation
-            [~, indices] = sort(randperm(size(population, 1)));
-            r = population(indices(1:3), :);
-            mutant = r(1, :) + F * (r(2, :) - r(3, :));
-        end
-
-        function trial = crossover(obj, target, mutant, CR)
-            % Crossover function for DE
-            cross_points = rand(size(target)) < CR;
-            % Ensure at least one true crossover point
-            if ~any(cross_points(:))
-                cross_points(randi(size(target, 2))) = true;
-            end
-            trial = mutant;
-            trial(cross_points) = target(cross_points);
-        end
-
-        function dv_i = mutation_penalty(obj, x_i, population, boundaries, mutation_factor,x_i_id)
-            % Mutation function with penalty for DE
-            % Inputs:
-            % x_i: target x_i
-            % subpop_i: number of individuals closest to x_i
-            % boundaries: boundaries/constraints of the function
-            % scaling_factor: scaling factor of the function
-            % Output:
-            % dv_i: donor vector that has been mutated and penalized.
-        
-            % Generate three distinct individuals xr1, xr1, xr1 from the current population randomly
-            pop_ids = 1:size(population, 1);
-            if nargin > 4 && ~isempty(x_i_id)
-                index_to_delete = x_i_id;
-            else
-                index_to_delete = find(all(population_copy == x_i, 2)); % Ensure that x_i is excluded from the selected subpopulation
-            end
-            pop_ids_no_i = setdiff(pop_ids, index_to_delete);
-            population = population(pop_ids_no_i, :);
-        
-            % Mutation form the donor/mutation vector
-            dv_i = obj.mutate(population, mutation_factor);
-        
-            % Set penalty for every donor vector that violates the boundaries
-            for j = 1:size(dv_i, 2)
-                if dv_i(j) < boundaries(j, 1)
-                    dv_i(j) = (x_i(j) + boundaries(j, 1)) / 2;
-                elseif dv_i(j) > boundaries(j, 2)
-                    dv_i(j) = (x_i(j) + boundaries(j, 2)) / 2;
+            empty_individual.Position = zeros(1,dimension);
+            empty_individual.Cost = [];
+            BestSol.Cost = inf;
+            pop = repmat(empty_individual, npoint, 1);
+            points = zeros(1,dimension);
+            for i=1:npoint
+                for j=1:dimension
+                   points(:,j)=round((boundaries(j,1)+(boundaries(j,2)-boundaries(j,1)).*A(i,j))*100)/100;
+                end
+                pop(i).Position = points;
+                pop(i).Cost = obj.objective_function(pop(i).Position);
+                if pop(i).Cost<BestSol.Cost
+                    BestSol = pop(i);
                 end
             end
         end
 
-        function [result_population,result_fitness] = reproduction(obj,population,boundaries,mutation_factor,crossover_rate,seed)
-            rng(seed); % Set random seed
-            for i = 1:size(population,1)
-                x_i = population(i,:);
-                dv_i = obj.mutation_penalty(x_i, population, boundaries, mutation_factor,i);
-                trial = obj.crossover(x_i, dv_i, crossover_rate);
-                if obj.objective_function(trial)<=obj.objective_function(x_i)
-                    population(i,:) = trial;
-                end
-            end
-            fitness_pop = zeros(1,size(population,1));
-            for i = 1:size(population,1)
-                fitness_pop(i) = obj.objective_function(population(i,:));
-            end
-            [result_fitness,id_fit] = sort(fitness_pop);
-            result_population = population(id_fit,:);
+        function donor_vec = mutate(obj,population,F,VarSize,boundaries, permvec)
+            a = permvec(1);
+            b = permvec(2);
+            c = permvec(3);
+
+            % Mutation
+            beta = repmat(F,VarSize);
+            donor_vec = population(permvec(1)).Position+beta.*(population(permvec(2)).Position-population(permvec(3)).Position);
+            donor_vec = max(donor_vec, boundaries(:,1)');
+            donor_vec = min(donor_vec, boundaries(:,2)');
         end
-            
-        function [best_point, best_score] = DE(obj, boundaries,population_size,max_generation,mutation_factor,crossover_rate,seed,print_stat)
-            rng(seed); % Set random seed
-            population = obj.generate_points(population_size, boundaries, seed);
-            % fitness = zeros(1, population_size);
-            % for i = 1:population_size
-            %     fitness(i) = obj.objective_function(population(i, :));
-            % end
-            % [best_score, best_idx] = min(fitness);
-            % best_point = population(best_idx,:);
 
-            for gen = 1:max_generation
-                [population,fitness] = obj.reproduction(population,boundaries,mutation_factor,crossover_rate,seed);
-                [best_score, best_idx] = min(fitness);
-                best_point = population(best_idx, :);
-                % for i = 1:population_size
-                %     x_i = population(i,:);
-                %     dv_i = obj.mutation_penalty(x_i, population, boundaries, mutation_factor,i);
-                %     trial = obj.crossover(x_i, dv_i, crossover_rate);
-                %     trial_fitness = obj.objective_function(trial);
-                % 
-                %     if trial_fitness <= fitness(i)
-                %         fitness(i) = trial_fitness;
-                %         population(i,:) = trial;
-                %         if trial_fitness < fitness(best_idx)
-                %             best_idx = i;
-                %             best_point = trial;
-                %             best_score = fitness(best_idx);
-                %         end
-                %     end
-                % end
-
-
-                if print_stat
-                    fprintf("=========Generation %d=========\n", gen);
-                    fprintf("Best Point: %s with score %.4f\n", mat2str(best_point), best_score);
+        function trial = crossover(obj,original_vec,donor_vec,crossover_rate)
+            trial = zeros(size(original_vec));
+            j0 = randi([1 numel(original_vec)]);
+            for j = 1:numel(original_vec)
+                if j == j0 || rand <= crossover_rate
+                    trial(j) = donor_vec(j);
+                else
+                    trial(j) = original_vec(j);
                 end
             end
         end
+
+        function [population,BestSol] = DE(obj,population,BestSol,boundaries,MaxIt,F,pCR,verbose)
+            nPop = size(population,1);
+            dimension = size(population(1).Position,2);
+            VarSize = [1 dimension];
+            BestCost = zeros(MaxIt, 1);
+            for it = 1:MaxIt
+                for i = 1:nPop
+
+                    x = population(i).Position;
+
+                    permvec = randperm(nPop); % Randomize the indices of the population
+                    permvec(permvec == i) = [];
+
+                    % Mutate
+                    dv_i = obj.mutate(population,F,VarSize,boundaries,permvec);
+
+                    % Crossover
+                    trial = obj.crossover(x,dv_i,pCR);
+
+                    % Offspring
+                    NewSol.Position = trial;
+                    NewSol.Cost = obj.objective_function(NewSol.Position);
+
+                    if NewSol.Cost<population(i).Cost
+                        population(i) = NewSol;
+
+                        if population(i).Cost<BestSol.Cost
+                           BestSol = population(i);
+                        end
+                    end
+
+                end
+
+                % Update Best Cost
+                BestCost(it) = BestSol.Cost;
+
+                if verbose == true
+                    % Show Iteration Information
+                    disp(['Iteration ' num2str(it) ': Best Cost = ' num2str(BestCost(it))]);
+                end
+
+            end
+        end
+
 
         function obj = initialization(obj)
-            points = obj.generate_points(obj.m_cluster,obj.boundaries,obj.seed);
-            fitness = zeros(size(points,1),1);
-            for i=1:size(points,1)
-                fitness(i)=obj.objective_function(points(i,:));
-            end
-            [~, best_idx] = min(fitness);
-            x_prime = points(best_idx, :);
+            [population,bestsol] = obj.generate_points(obj.m_cluster,obj.boundaries,obj.seed);
             
             first_radius = (obj.boundaries(:, 2) - obj.boundaries(:, 1)) / 2;
             radii = min(first_radius);
 
-            obj.cluster_center = x_prime;
+            obj.cluster_center = bestsol.Position;
             obj.cluster_radius = radii;
-            obj.cluster_iter_points = points;
+            obj.cluster_iter_points = population;
+            obj.cluster_iter_bestsol = bestsol;
         end
 
         function function_cluster(obj,y)
@@ -227,12 +233,12 @@ classdef SDDE < handle
             while k < obj.k_cluster
                 potential_cluster_center = [];
                 for i = 1:size(obj.cluster_iter_points,1)
-                    func_point = obj.objective_function(obj.cluster_iter_points(i,:));
+                    func_point = obj.cluster_iter_points(i).Cost;
             
                     % If F(x_i)<gamma and x_i is not the center of existing cluster, x_i may have a possibility to become a cluster center
-                    exist_in_cluster_center = any(vecnorm(obj.cluster_iter_points(i,:) - obj.cluster_center) < obj.epsilon);
+                    exist_in_cluster_center = any(vecnorm(obj.cluster_iter_points(i).Position - obj.cluster_center) < obj.epsilon);
                     if func_point < obj.gamma && exist_in_cluster_center == 0
-                        potential_cluster_center = [potential_cluster_center; obj.cluster_iter_points(i,:)];
+                        potential_cluster_center = [potential_cluster_center; obj.cluster_iter_points(i).Position];
                     end
                 end
                 % Apply function cluster
@@ -241,7 +247,8 @@ classdef SDDE < handle
                 end
             
                 if visual_properties.show_visual == true || visual_properties.save_visual == true
-                    scatter(obj.cluster_iter_points(:,1), obj.cluster_iter_points(:,2), 30, 'filled');
+                    population_array = reshape([obj.cluster_iter_points.Position], obj.dim, [])';
+                    scatter(population_array(:,1), population_array(:,2), 30, 'filled');
                     rectangle('Position',[obj.boundaries(:,1)',(obj.boundaries(:,2)-obj.boundaries(:,1))'],'EdgeColor','#FF0000')
                     xlim(1.5 * obj.boundaries(1,:));
                     ylim(1.5 * obj.boundaries(2,:));
@@ -259,7 +266,7 @@ classdef SDDE < handle
                         viscircles(obj.cluster_center(c,:), obj.cluster_radius(c), Color="#00FFFF", Linestyle='-.');
                         hold off
                     end
-                    pause(0.25)
+                    pause(0.1)
                     
                     if visual_properties.save_visual == true
                         frame = getframe(gcf);
@@ -267,8 +274,9 @@ classdef SDDE < handle
                     end
                 end
 
-                [obj.cluster_iter_points,~] = obj.reproduction(obj.cluster_iter_points, ...
-                    obj.boundaries,obj.mutation_factor,obj.crossover_rate,obj.seed);
+                % [obj.cluster_iter_points,~] = obj.reproduction(obj.cluster_iter_points, ...
+                %     obj.boundaries,obj.mutation_factor,obj.crossover_rate,obj.seed);
+                [obj.cluster_iter_points,obj.cluster_iter_bestsol] = obj.DE(obj.cluster_iter_points,obj.cluster_iter_bestsol,obj.boundaries,1,obj.mutation_factor,obj.crossover_rate,false);
             
                 k = k + 1;
             end
@@ -333,12 +341,13 @@ classdef SDDE < handle
             
             archive = [];
             score = [];
-            
+
             for i = 1:length(obj.cluster_center)
                 subbound = [obj.cluster_center(i,:)' - obj.cluster_radius(i), obj.cluster_center(i,:)' + obj.cluster_radius(i)];
-                [root, root_score] = obj.DE(subbound,obj.m,obj.k_max,obj.mutation_factor,obj.crossover_rate,obj.seed,superverbose);
-                archive = [archive;root];
-                score = [score;root_score];
+                [popbound,BestSol] = obj.generate_points(obj.m,subbound,obj.seed);
+                [~,BestSol] = obj.DE(popbound,BestSol,subbound,obj.k_max,obj.mutation_factor,obj.crossover_rate,superverbose);
+                archive = [archive;BestSol.Position];
+                score = [score;BestSol.Cost];
                 if verbose == true
                     fprintf('\n====== Cluster %d ======\n', i);
                     disp(archive);

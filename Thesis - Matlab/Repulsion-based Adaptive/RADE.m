@@ -41,16 +41,53 @@ classdef RADE < handle
             obj.seed = seed;
         end
 
+        % % Problem 1
         % function F_array = system_equations(obj,x)
         %     f1 = exp(x(1)-x(2)) - sin(x(1)+x(2));
         %     f2 = (x(1)*x(2))^2 - cos(x(1)+x(2));
         %     F_array = [f1; f2];
         % end
 
+        % % Problem 2
+        % function F_array = system_equations(obj,x)
+        %     f1 = 0.5 * sin(x(1) * x(2)) - 0.25 * x(2) / pi - 0.5 * x(1);
+        %     f2 = (1 - 0.25 / pi) * (exp(2 * x(1)) - exp(1)) + exp(1) * x(2) / pi - 2 * exp(1) * x(1);
+        %     F_array = [f1; f2];
+        % end
+
+        % % Problem 4
+        % function F_array = system_equations(obj,x)
+        %     % g1 = x(1)*x(2)^3 / 12 - (x(1) - 2*x(3))*(x(2) - 2*x(3))^3 / 12 - 9369;
+        %     % g2 = 2*(x(2) - x(3))^2 * (x(1) - x(3))^2 * x(3) / (x(2) + x(1) - 2*x(3)) - 6835;
+        %     f1 = x(1)*x(2) - (x(1) - 2*x(3))*(x(2) - 2*x(3)) - 165;
+        %     f2 = x(1)*x(2)^3 / 12 - (x(1) - 2*x(3))*(x(2) - 2*x(3))^3 / 12 - 9369;
+        %     f3 = (2*((x(2)-x(3))^2)*((x(1)-x(3))^2)*x(3))/(x(2)+x(1)-2*x(3)) - 6835;
+        %     F_array = [f1; f2; f3];
+        % end
+
+        % % Problem 5
+        % function F_array = system_equations(obj,x)
+        %     f1 = 2*x(1) + x(2) + x(3) + x(4) + x(5) - 6;
+        %     f2 = x(1) + 2*x(2) + x(3) + x(4) + x(5) - 6;
+        %     f3 = x(1) + x(2) + 2*x(3) + x(4) + x(5) - 6;
+        %     f4 = x(1) + x(2) + x(3) + 2*x(4) + x(5) - 6;
+        %     f5 = x(1)*x(2)*x(3)*x(4)*x(5) - 1;
+        %     F_array = [f1; f2;f3;f4;f5];
+        % end
+
+        % % Problem 6
+        % function F_array = system_equations(obj,x)
+        %     f1 = x(1)^2 + x(1)*x(2) - 6;
+        %     f2 = x(1)^2 + x(2)^3 + 2*x(1)*x(2)^2-3;
+        %     F_array = [f1; f2];
+        % end
+
+        % Problem 7
         function F_array = system_equations(obj,x)
-            f1 = 0.5 * sin(x(1) * x(2)) - 0.25 * x(2) / pi - 0.5 * x(1);
-            f2 = (1 - 0.25 / pi) * (exp(2 * x(1)) - exp(1)) + exp(1) * x(2) / pi - 2 * exp(1) * x(1);
-            F_array = [f1; f2];
+            f1 = x(1)^2-x(1)-x(2)^2-x(2)+x(3)^2;
+            f2 = sin(x(2)-exp(x(1)));
+            f3 = x(3)-log(abs(x(2)));
+            F_array = [f1; f2; f3];
         end
 
         function res = objective_function(obj, x)
@@ -98,87 +135,63 @@ classdef RADE < handle
             end
         end
 
-        function points = generate_points(obj,npoint,boundaries,seed)
-            rng(seed)
+        function [pop,BestSol] = generate_points(obj,npoint,boundaries,seed)
+            rng(seed);
             dimension = size(boundaries,1);
             p = sobolset(dimension);
             p = scramble(p,'MatousekAffineOwen');
             A = net(p,npoint);
-            points = zeros(npoint,dimension);
-            for i=1:dimension
-               points(:,i)=round((boundaries(i,1)+(boundaries(i,2)-boundaries(i,1)).*A(:,i))*100)/100;
-            end
-        end
-
-        function mutant = mutate(obj, population, F)
-            % Mutation function for DE
-            % Vectorized mutation operation
-            [~, indices] = sort(randperm(size(population, 1)));
-            r = population(indices(1:3), :);
-            mutant = r(1, :) + F * (r(2, :) - r(3, :));
-        end
-
-        function trial = crossover(obj, target, mutant, CR)
-            % Crossover function for DE
-            cross_points = rand(size(target)) < CR;
-            % Ensure at least one true crossover point
-            if ~any(cross_points(:))
-                cross_points(randi(size(target, 2))) = true;
-            end
-            trial = mutant;
-            trial(cross_points) = target(cross_points);
-        end
-
-        function dv_i = mutation_penalty(obj, x_i, subpop_i, boundaries, scaling_factor)
-            % Mutation function with penalty for DE
-            % Inputs:
-            % x_i: target x_i
-            % subpop_i: number of individuals closest to x_i
-            % boundaries: boundaries/constraints of the function
-            % scaling_factor: scaling factor of the function
-            % Output:
-            % dv_i: donor vector that has been mutated and penalized.
-        
-            % Generate three distinct individuals xr1, xr1, xr1 from the current population randomly
-            pop_ids = 1:size(subpop_i, 1);
-            indices_to_delete = find(all(subpop_i == x_i, 2)); % Ensure that x_i is excluded from the selected subpopulation
-            subpop_ids_no_i = setdiff(pop_ids, indices_to_delete);
-            subpop_i = subpop_i(subpop_ids_no_i, :);
-        
-            % Mutation form the donor/mutation vector
-            dv_i = obj.mutate(subpop_i, scaling_factor);
-        
-            % Set penalty for every donor vector that violates the boundaries
-            for j = 1:size(dv_i, 2)
-                if dv_i(j) < boundaries(j, 1)
-                    dv_i(j) = (x_i(j) + boundaries(j, 1)) / 2;
-                elseif dv_i(j) > boundaries(j, 2)
-                    dv_i(j) = (x_i(j) + boundaries(j, 2)) / 2;
+            empty_individual.Position = zeros(1,dimension);
+            empty_individual.Cost = [];
+            BestSol.Cost = inf;
+            pop = repmat(empty_individual, npoint, 1);
+            points = zeros(1,dimension);
+            for i=1:npoint
+                for j=1:dimension
+                   points(:,j)=round((boundaries(j,1)+(boundaries(j,2)-boundaries(j,1)).*A(i,j))*100)/100;
+                end
+                pop(i).Position = points;
+                pop(i).Cost = obj.objective_function(pop(i).Position);
+                if pop(i).Cost<BestSol.Cost
+                    BestSol = pop(i);
                 end
             end
         end
 
-        function subpop = subpopulating(obj, individual, population, t)
-            % Calculate Euclidean distances and select t closest individuals.
-            % Inputs:
-            % individual: individual target
-            % population: population where the target is
-            % t: max number of units in a subpopulation
-            % return_index: optional, flag to return indices of closest individuals
-            % show_distances: optional, flag to print distances
-            % Outputs:
-            % closest_indices: array of closest index of the target individual
-            % subpop: array of closest individuals of the target individual
-        
-            % Calculate the Euclidean distances from the individual to all others in the population
-            distances = sqrt(sum((population - individual) .^ 2, 2));
+        function donor_vec = mutate(obj,population,F,VarSize,boundaries, permvec)
+            a = permvec(1);
+            b = permvec(2);
+            c = permvec(3);
+
+            % Mutation
+            F_array = repmat(F,VarSize);
+            donor_vec = population(a).Position+F_array.*(population(b).Position-population(c).Position);
+            donor_vec = max(donor_vec, boundaries(:,1)');
+            donor_vec = min(donor_vec, boundaries(:,2)');
+        end
+
+        function trial = crossover(obj,original_vec,donor_vec,crossover_rate)
+            trial = zeros(size(original_vec));
+            j0 = randi([1 numel(original_vec)]);
+            for j = 1:numel(original_vec)
+                if j == j0 || rand <= crossover_rate
+                    trial(j) = donor_vec(j);
+                else
+                    trial(j) = original_vec(j);
+                end
+            end
+        end
+
+        function [subpop,closest_indices] = subpopulating(obj, individual, population, t)
+            population_array = reshape([population.Position], obj.dim, [])';
+            distances = sqrt(sum((population_array - individual) .^ 2, 2));
         
             % Get the indices of the individuals with the smallest distances
             [~, sorted_indices] = sort(distances);
             closest_indices = sorted_indices(1:t);
         
             % Form the subpopulation with the closest individuals
-            subpop = population(closest_indices, :);
+            subpop = population(closest_indices);
         end
 
         function archive = update_archive(obj, x, archive)
@@ -241,11 +254,9 @@ classdef RADE < handle
             hi = randi(obj.max_memories_size);
             % Generate Fi using the Cauchy distribution with the location parameter MF(hi) and scale 0.1
             Fi = obj.update_Fi(hi);
-            % Fi = obj.memories_F(hi) + 0.1*trnd(1,1);
             % Generate CRi using the Gaussian distribution with mean MCR(hi) and standard deviation 0.1
             CRi = normrnd(obj.memories_CR(hi), 0.1);
-            % Ensure CRi is within the range [0, 1] and Fi is within the range [0,2]
-            % Fi = min(max(Fi, 0), 1);
+            % Ensure CRi is within the range [0, 1]
             CRi = min(max(CRi, 0), 1);
 
         end
@@ -289,15 +300,7 @@ classdef RADE < handle
 
         function [final_root,final_score] = DE_evaluation(obj,verbose,visual_properties)
             rng(obj.seed);
-            population = obj.generate_points(obj.population_size,obj.boundaries,obj.seed);
-            
-            fitness = zeros(1, obj.population_size);
-            for i = 1:obj.population_size
-                fitness(i) = obj.objective_function(population(i, :));
-            end
-            
-            [best_fitness, best_idx] = min(fitness);
-            best = population(best_idx, :);
+            [population,bestsol] = obj.generate_points(obj.population_size,obj.boundaries,obj.seed);
             
             % Animation Saving Setting
             if visual_properties.save_visual == true
@@ -320,35 +323,40 @@ classdef RADE < handle
             updated_list = [0];
             memoriesF = [];
             memoriesCR = [];
+            VarSize = [1 obj.dim];
             for gen = 1:obj.max_generation
                 updated = 0;
                     
                 for ind=1:obj.population_size
-                    obj.archive = obj.update_archive(population(ind,:),obj.archive);
+                    obj.archive = obj.update_archive(population(ind).Position,obj.archive);
                 end
                 
                 S_F = [];
                 S_CR = [];
                 for i = 1:obj.population_size
                     [F_i, CR_i] = obj.update_parameter();
-                    x_i = population(i, :);
-                    subpop_i = obj.subpopulating(x_i, population, obj.num_per_subpopulation);
-                    mutant = obj.mutation_penalty(x_i, subpop_i, obj.boundaries, F_i);
-                    trial = obj.crossover(population(i, :), mutant, CR_i);
+                    x_i = population(i).Position;
+                    [subpop_i,~] = obj.subpopulating(x_i, population, obj.num_per_subpopulation);
+
+                    permvec = randperm(obj.num_per_subpopulation); % Randomize the indices of the population
+                    permvec(permvec == i) = [];
+                    mutant = obj.mutate(subpop_i,F_i,VarSize,obj.boundaries, permvec);
+                    trial = obj.crossover(x_i,mutant,CR_i);
                     trial_fitness = obj.fitness_function(trial);
-                    % fprintf("fitness(%d) = %.5f \n",i,fitness(i))
-                    % fprintf("trial_fitness = %.5f \n",trial_fitness)
+                    [subpop_closest_trial,closest_indices] = obj.subpopulating(trial,population,2);
+                    closest_trial = subpop_closest_trial(end);
+                    closest_trial.Cost = obj.fitness_function(closest_trial.Position);
                     
-                    if trial_fitness < fitness(i)
-                        fitness(i) = trial_fitness;
-                        population(i, :) = trial;
+                    if trial_fitness < closest_trial.Cost
+                        population(closest_indices(end)).Position = trial;
+                        population(closest_indices(end)).Cost = trial_fitness;
                         S_F = [S_F, F_i];
                         S_CR = [S_CR, CR_i];
                         updated = updated + 1;
-                        if trial_fitness < best_fitness
+                        if trial_fitness < bestsol.Cost
                             best_idx = i;
-                            best = trial;
-                            best_fitness = trial_fitness;
+                            bestsol.Position = trial;
+                            bestsol.Cost = trial_fitness;
                         end
                     end
                     if ~isempty(S_F) && ~isempty(S_CR)
@@ -405,7 +413,8 @@ classdef RADE < handle
                     subplot(2, 2, 4);
                     % scatter(answ(:,1),answ(:,2), 50,"MarkerEdgeColor","#EDB120","LineWidth",2);
                     % hold on;
-                    scatter(population(:,1), population(:,2), 5, 'filled', 'blue');    
+                    population_array = reshape([population.Position], obj.dim, [])';
+                    scatter(population_array(:,1), population_array(:,2), 5, 'filled','blue'); 
                     % hold off;
                     rectangle('Position',[obj.boundaries(:,1)',(obj.boundaries(:,2)-obj.boundaries(:,1))'],'EdgeColor','#FF0000')
                     grid on;
@@ -413,18 +422,18 @@ classdef RADE < handle
 
                 if visual_properties.show_visual == true || visual_properties.save_visual == true
                     % Adjust aspect ratio
-                    axis equal;
-                    pbaspect([diff(xlim()) diff(ylim()) 1]);
+                    % axis equal;
+                    % pbaspect([diff(xlim()) diff(ylim()) 1]);
         
                     % Maximize figure window
                     set(gcf, 'WindowState', 'maximized');
                     if ~isempty(obj.archive)
                         hold on
-                        plot(obj.archive(:,1), obj.archive(:,2),'*',Color='#EDB120',MarkerSize=50);
+                        plot(obj.archive(:,1), obj.archive(:,2),'*',"color",'#EDB120',"MarkerSize",50);
                         hold off
                     end
                     title(sprintf("Generation %d",gen))
-                    pause(0.05)
+                    pause(0.01)
                     if visual_properties.save_visual == true
                         frame = getframe(gcf);
                         writeVideo(writerObj, frame);
@@ -438,12 +447,6 @@ classdef RADE < handle
             for fin_iter = 1:size(final_root,1)
                 final_score(fin_iter) = obj.objective_function(final_root(fin_iter, :));
             end
-            
-
-
         end
-
-
     end
 end
-

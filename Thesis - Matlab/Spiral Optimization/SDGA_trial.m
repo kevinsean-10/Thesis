@@ -12,7 +12,7 @@ k_cluster = 10;
 m = 250;
 k_max = 250;
 seed = 'shuffle';
-verbose = true;
+verbose = false;
 print_stat = false;
 visual_properties = struct('show_visual',false, ...
     'save_visual', false, ...

@@ -36,10 +36,46 @@ classdef HDE < handle
             obj.final_score = [];
         end
         
+        % % Problem 1
+        % function F_array = system_equations(obj,x)
+        %     f1 = exp(x(1)-x(2)) - sin(x(1)+x(2));
+        %     f2 = (x(1)*x(2))^2 - cos(x(1)+x(2));
+        %     F_array = [f1; f2];
+        % end
+
+        % % Problem 2
+        % function F_array = system_equations(obj,x)
+        %     f1 = 0.5 * sin(x(1) * x(2)) - 0.25 * x(2) / pi - 0.5 * x(1);
+        %     f2 = (1 - 0.25 / pi) * (exp(2 * x(1)) - exp(1)) + exp(1) * x(2) / pi - 2 * exp(1) * x(1);
+        %     F_array = [f1; f2];
+        % end
+
+        % % Problem 4
+        % function F_array = system_equations(obj,x)
+        %     % g1 = x(1)*x(2)^3 / 12 - (x(1) - 2*x(3))*(x(2) - 2*x(3))^3 / 12 - 9369;
+        %     % g2 = 2*(x(2) - x(3))^2 * (x(1) - x(3))^2 * x(3) / (x(2) + x(1) - 2*x(3)) - 6835;
+        %     f1 = x(1)*x(2) - (x(1) - 2*x(3))*(x(2) - 2*x(3)) - 165;
+        %     f2 = x(1)*x(2)^3 / 12 - (x(1) - 2*x(3))*(x(2) - 2*x(3))^3 / 12 - 9369;
+        %     f3 = (2*((x(2)-x(3))^2)*((x(1)-x(3))^2)*x(3))/(x(2)+x(1)-2*x(3)) - 6835;
+        %     F_array = [f1; f2; f3];
+        % end
+
+        % % Problem 5
+        % function F_array = system_equations(obj,x)
+        %     f1 = 2*x(1) + x(2) + x(3) + x(4) + x(5) - 6;
+        %     f2 = x(1) + 2*x(2) + x(3) + x(4) + x(5) - 6;
+        %     f3 = x(1) + x(2) + 2*x(3) + x(4) + x(5) - 6;
+        %     f4 = x(1) + x(2) + x(3) + 2*x(4) + x(5) - 6;
+        %     f5 = x(1)*x(2)*x(3)*x(4)*x(5) - 1;
+        %     F_array = [f1; f2;f3;f4;f5];
+        % end
+        
+        % Problem 7
         function F_array = system_equations(obj,x)
-            f1 = exp(x(1)-x(2)) - sin(x(1)+x(2));
-            f2 = (x(1)*x(2))^2 - cos(x(1)+x(2));
-            F_array = [f1; f2];
+            f1 = x(1)^2-x(1)-x(2)^2-x(2)+x(3)^2;
+            f2 = sin(x(2)-exp(x(1)));
+            f3 = x(3)-log(abs(x(2)));
+            F_array = [f1; f2; f3];
         end
 
         function res = objective_function(obj, x)
@@ -48,105 +84,94 @@ classdef HDE < handle
             res = -1 / (1 + res);
         end
 
-        function points = generate_points(obj,npoint,boundaries,seed)
+        function [pop,BestSol] = generate_points(obj,npoint,boundaries,seed)
             rng(seed)
             dimension = size(boundaries,1);
             p = sobolset(dimension);
             p = scramble(p,'MatousekAffineOwen');
             A = net(p,npoint);
-            points = zeros(npoint,dimension);
-            for i=1:dimension
-               points(:,i)=round((boundaries(i,1)+(boundaries(i,2)-boundaries(i,1)).*A(:,i))*100)/100;
-            end
-        end
-
-        function mutant = mutate(obj, population, F)
-            % Mutation function for DE
-            % Vectorized mutation operation
-            [~, indices] = sort(randperm(size(population, 1)));
-            r = population(indices(1:3), :);
-            mutant = r(1, :) + F * (r(2, :) - r(3, :));
-        end
-
-        function trial = crossover(obj, target, mutant, CR)
-            % Crossover function for DE
-            cross_points = rand(size(target)) < CR;
-            % Ensure at least one true crossover point
-            if ~any(cross_points(:))
-                cross_points(randi(size(target, 2))) = true;
-            end
-            trial = mutant;
-            trial(cross_points) = target(cross_points);
-        end
-
-        function dv_i = mutation_penalty(obj, x_i, population, boundaries, mutation_factor,x_i_id)
-            % Mutation function with penalty for DE
-            % Inputs:
-            % x_i: target x_i
-            % subpop_i: number of individuals closest to x_i
-            % boundaries: boundaries/constraints of the function
-            % scaling_factor: scaling factor of the function
-            % Output:
-            % dv_i: donor vector that has been mutated and penalized.
-        
-            % Generate three distinct individuals xr1, xr1, xr1 from 
-            % the current population randomly
-            population_copy = population;
-            pop_ids = 1:size(population_copy, 1);
-            if nargin > 4 && ~isempty(x_i_id)
-                index_to_delete = x_i_id;
-            else
-                index_to_delete = find(all(population_copy == x_i, 2)); 
-                % Ensure that x_i is excluded from the selected subpopulation
-            end
-            pop_ids_no_i = setdiff(pop_ids, index_to_delete);
-            population_copy = population_copy(pop_ids_no_i, :);
-        
-            % Mutation form the donor/mutation vector
-            dv_i = obj.mutate(population_copy, mutation_factor);
-        
-            % Set penalty for every donor vector that violates the boundaries
-            for j = 1:size(dv_i, 2)
-                if dv_i(j) < boundaries(j, 1)
-                    dv_i(j) = (x_i(j) + boundaries(j, 1)) / 2;
-                elseif dv_i(j) > boundaries(j, 2)
-                    dv_i(j) = (x_i(j) + boundaries(j, 2)) / 2;
+            empty_individual.Position = zeros(1,dimension);
+            empty_individual.Cost = [];
+            BestSol.Cost = inf;
+            pop = repmat(empty_individual, npoint, 1);
+            points = zeros(1,dimension);
+            for i=1:npoint
+                for j=1:dimension
+                   points(:,j)=round((boundaries(j,1)+(boundaries(j,2)-boundaries(j,1)).*A(i,j))*100)/100;
+                end
+                pop(i).Position = points;
+                pop(i).Cost = obj.objective_function(pop(i).Position);
+                if pop(i).Cost<BestSol.Cost
+                    BestSol = pop(i);
                 end
             end
         end
 
-        function [best_point, best_score] = DE(obj, boundaries,population_size,max_generation,mutation_factor,crossover_rate,seed,print_stat)
-            rng(seed); % Set random seed
-            population = obj.generate_points(population_size, boundaries, seed);
-            fitness = zeros(1, population_size);
-            for i = 1:population_size
-                fitness(i) = obj.objective_function(population(i, :));
+        function donor_vec = mutate(obj,population,F,VarSize,boundaries, permvec)
+            a = permvec(1);
+            b = permvec(2);
+            c = permvec(3);
+
+            % Mutation
+            beta = repmat(F,VarSize);
+            donor_vec = population(a).Position+beta.*(population(b).Position-population(c).Position);
+            donor_vec = max(donor_vec, boundaries(:,1)');
+            donor_vec = min(donor_vec, boundaries(:,2)');
+        end
+
+        function trial = crossover(obj,original_vec,donor_vec,crossover_rate)
+            trial = zeros(size(original_vec));
+            j0 = randi([1 numel(original_vec)]);
+            for j = 1:numel(original_vec)
+                if j == j0 || rand <= crossover_rate
+                    trial(j) = donor_vec(j);
+                else
+                    trial(j) = original_vec(j);
+                end
             end
-            [best_score, best_idx] = min(fitness);
-            best_point = population(best_idx,:);
+        end
 
-            for gen = 1:max_generation
-                for i = 1:population_size
-                    x_i = population(i,:);
-                    dv_i = obj.mutation_penalty(x_i, population, boundaries, mutation_factor,i);
-                    trial = obj.crossover(x_i, dv_i, crossover_rate);
-                    trial_fitness = obj.objective_function(trial);
+        function [population,BestSol] = DE(obj,population,BestSol,boundaries,MaxIt,F,pCR,verbose)
+            nPop = size(population,1);
+            dimension = size(population(1).Position,2);
+            VarSize = [1 dimension];
+            BestCost = zeros(MaxIt, 1);
+            for it = 1:MaxIt
+                for i = 1:nPop
 
-                    if trial_fitness <= fitness(i)
-                        fitness(i) = trial_fitness;
-                        population(i,:) = trial;
-                        if trial_fitness < fitness(best_idx)
-                            best_idx = i;
-                            best_point = trial;
-                            best_score = fitness(best_idx);
+                    x = population(i).Position;
+
+                    permvec = randperm(nPop); % Randomize the indices of the population
+                    permvec(permvec == i) = [];
+
+                    % Mutate
+                    dv_i = obj.mutate(population,F,VarSize,boundaries,permvec);
+
+                    % Crossover
+                    trial = obj.crossover(x,dv_i,pCR);
+
+                    % Offspring
+                    NewSol.Position = trial;
+                    NewSol.Cost = obj.objective_function(NewSol.Position);
+
+                    if NewSol.Cost<population(i).Cost
+                        population(i) = NewSol;
+
+                        if population(i).Cost<BestSol.Cost
+                           BestSol = population(i);
                         end
                     end
+
                 end
 
-                if print_stat
-                    fprintf("=========Generation %d=========\n", gen);
-                    fprintf("Best Point: %s with score %.4f\n", mat2str(best_point), best_score);
+                % Update Best Cost
+                BestCost(it) = BestSol.Cost;
+
+                if verbose == true
+                    % Show Iteration Information
+                    disp(['Iteration ' num2str(it) ': Best Cost = ' num2str(BestCost(it))]);
                 end
+
             end
         end
 
@@ -260,11 +285,11 @@ classdef HDE < handle
                 for d = 1:size(obj.cluster, 2)
                     subbound(d, :) = [min(obj.cluster(:, d, i)), max(obj.cluster(:, d, i))];
                 end
-        
-                [root, root_score] = obj.DE(subbound,obj.population_size,obj.max_generation,obj.mutation_factor,obj.crossover_rate,obj.seed,superverbose);
+                [popbound,BestSol] = obj.generate_points(obj.population_size,subbound,obj.seed);
+                [~,BestSol] = obj.DE(popbound,BestSol,subbound,obj.max_generation,obj.mutation_factor,obj.crossover_rate,superverbose);
                 
-                obj.archive{end+1} = root;
-                obj.score(end+1) = root_score;
+                obj.archive{end+1} = BestSol.Position;
+                obj.score(end+1) = BestSol.Cost;
                 
                 if verbose
                     fprintf('\n====== Cluster %d ======\n', i);
@@ -328,7 +353,7 @@ classdef HDE < handle
             end
 
             for j = 1: size(obj.final_root,1)
-                plot(obj.final_root(j,1), obj.final_root(j,2), '*',Color='magenta');
+                plot(obj.final_root(j,1), obj.final_root(j,2), '*','Color','magenta');
                 pause(0.25)
                 if visual_properties.save_visual == true
                     frame = getframe(gcf);
