@@ -4,18 +4,18 @@ clear; clc; close all
 pop_size=250;
 max_gen=250;
 
+seed = 'shuffle';
 F_init=0.5;
 CR_init=0.5;
-num_l=10;
+num_l=20;
 theta=1e-6;
-tau_d=0.5;
+tau_d=0.4;
 s_max=20;
 print_gen=true;
 Hm = 50;
-dim = 3;
-seed = 'shuffle';
+dim = 2;
 beta = 1;
-rho = tau_d;
+rho = 0.1;
 
 rngseed = rng(seed);
 disp(rngseed.Seed)
@@ -23,19 +23,21 @@ basename = 'rade';
 us = '_';
 extension = '.avi';
 
-visual_properties = struct('show_visual',false, ...
+visual_properties = struct('show_visual',true, ...
                             'save_visual', false, ...
                             'file_name', [basename,us,num2str(pop_size),us,num2str(max_gen),us,num2str(rngseed.Seed),extension]);
 
 % Define boundaries
 % Problem 1 and 5
-% boundaries = repmat([-10, 10], dim, 1);
+boundaries = repmat([-10, 10], dim, 1);
 % % Problem 2
 % boundaries = [-1,3;-17,4];
 % % Problem 4
 % boundaries = repmat([-40, 40], dim, 1);
-% Problem 7
-boundaries = [0,2;-10,10;-1,1];
+% % Problem 7
+% boundaries = [0,2;-10,10;-1,1];
+% % Problem 8
+% boundaries = [-0.6,6;-0.6,-0.6;-5,5];
 
 
 radeopt = RADE(boundaries,pop_size,num_l,max_gen,s_max,theta,tau_d,F_init,CR_init,Hm,beta,rho,seed);
@@ -47,6 +49,9 @@ mean_F = mean(radeopt.memories_F)
 std_F = std(radeopt.memories_F) 
 mean_CR = mean(radeopt.memories_CR)
 std_CR = std(radeopt.memories_CR)
+
+% pause(2);
+% close;
 
 %%
 

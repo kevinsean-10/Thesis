@@ -235,48 +235,54 @@ classdef HDE < handle
             obj.cluster = cat(3, obj.cluster{:});
         end
 
-        function final_root = root_elimination(obj,root_archive)
+        function clean_roots = root_elimination(obj,root_archive)
             eligible_roots = [];
             for i = 1:size(root_archive,1)
                 if obj.objective_function(root_archive(i,:)) < -1 + obj.epsilon
                     eligible_roots = [eligible_roots; root_archive(i,:)];
                 end
             end
-            
-            id_duplicated_roots = [];
-            for i = 1:length(eligible_roots)
-                for j = i+1:length(eligible_roots)
-                    if norm(eligible_roots(i,:) - eligible_roots(j,:)) < obj.delta
-                        id_duplicated_roots = [id_duplicated_roots; [i, j]];
+            eligible_roots
+            if size(eligible_roots,1) >1
+                id_duplicated_roots = [];
+                for i = 1:length(eligible_roots)
+                    for j = i+1:length(eligible_roots)
+                        if norm(eligible_roots(i,:) - eligible_roots(j,:)) < obj.delta
+                            id_duplicated_roots = [id_duplicated_roots; [i, j]];
+                        end
                     end
                 end
-            end
-            
-            id_duplicated_roots = unique(id_duplicated_roots, 'rows');
-            
-            deselected_id_duplicated_roots = [];
-            for i = 1:size(id_duplicated_roots, 1)
-                root_a = obj.objective_function(eligible_roots(id_duplicated_roots(i, 1),:));
-                root_b = obj.objective_function(eligible_roots(id_duplicated_roots(i, 2),:));
-                if root_a <= root_b
-                    id_duplicated_root = id_duplicated_roots(i, 2);
-                else
-                    id_duplicated_root = id_duplicated_roots(i, 1);
+                
+                id_duplicated_roots = unique(id_duplicated_roots, 'rows');
+                
+                deselected_id_duplicated_roots = [];
+                for i = 1:size(id_duplicated_roots, 1)
+                    root_a = obj.objective_function(eligible_roots(id_duplicated_roots(i, 1),:));
+                    root_b = obj.objective_function(eligible_roots(id_duplicated_roots(i, 2),:));
+                    if root_a <= root_b
+                        id_duplicated_root = id_duplicated_roots(i, 2);
+                    else
+                        id_duplicated_root = id_duplicated_roots(i, 1);
+                    end
+                    deselected_id_duplicated_roots = [deselected_id_duplicated_roots; id_duplicated_root];
+                
                 end
-                deselected_id_duplicated_roots = [deselected_id_duplicated_roots; id_duplicated_root];
-            end
-            
-            if ~isempty(deselected_id_duplicated_roots)
-                unique_roots = true(size(eligible_roots,1),1);
-                unique_roots(deselected_id_duplicated_roots) = false;
-                final_root = eligible_roots(unique_roots,:);
+                
+                if ~isempty(deselected_id_duplicated_roots)
+                    unique_roots = true(size(eligible_roots,1),1);
+                    unique_roots(deselected_id_duplicated_roots) = false;
+                    clean_roots = eligible_roots(unique_roots,:);
+                else
+                    clean_roots = eligible_roots;
+                end
             else
-                final_root = eligible_roots;
+                clean_roots = eligible_roots;
             end
         end
 
         function [final_root,final_score] = DE_evaluation(obj, verbose, superverbose)
             obj.clustering()
+            num_cluster = size(obj.cluster,1);
             if verbose == true
                 fprintf("Number of clusters containing root: %d\n", size(obj.cluster, 3));
             end
@@ -304,7 +310,7 @@ classdef HDE < handle
                 archive_matrix(i, :) = obj.archive{i};
             end
 
-            final_root = root_elimination(obj, archive_matrix);
+            final_root = obj.root_elimination(archive_matrix);
             final_score = zeros(1, size(final_root,1));
             for fin_iter = 1:size(final_root,1)
                 final_score(fin_iter) = obj.objective_function(final_root(fin_iter, :));

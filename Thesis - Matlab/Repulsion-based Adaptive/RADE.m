@@ -41,12 +41,12 @@ classdef RADE < handle
             obj.seed = seed;
         end
 
-        % % Problem 1
-        % function F_array = system_equations(obj,x)
-        %     f1 = exp(x(1)-x(2)) - sin(x(1)+x(2));
-        %     f2 = (x(1)*x(2))^2 - cos(x(1)+x(2));
-        %     F_array = [f1; f2];
-        % end
+        % Problem 1
+        function F_array = system_equations(obj,x)
+            f1 = exp(x(1)-x(2)) - sin(x(1)+x(2));
+            f2 = (x(1)*x(2))^2 - cos(x(1)+x(2));
+            F_array = [f1; f2];
+        end
 
         % % Problem 2
         % function F_array = system_equations(obj,x)
@@ -82,13 +82,13 @@ classdef RADE < handle
         %     F_array = [f1; f2];
         % end
 
-        % Problem 7
-        function F_array = system_equations(obj,x)
-            f1 = x(1)^2-x(1)-x(2)^2-x(2)+x(3)^2;
-            f2 = sin(x(2)-exp(x(1)));
-            f3 = x(3)-log(abs(x(2)));
-            F_array = [f1; f2; f3];
-        end
+        % % Problem 7
+        % function F_array = system_equations(obj,x)
+        %     f1 = x(1)^2-x(1)-x(2)^2-x(2)+x(3)^2;
+        %     f2 = sin(x(2)-exp(x(1)));
+        %     f3 = x(3)-log(abs(x(2)));
+        %     F_array = [f1; f2; f3];
+        % end
 
         function res = objective_function(obj, x)
             F_array = obj.system_equations(x);

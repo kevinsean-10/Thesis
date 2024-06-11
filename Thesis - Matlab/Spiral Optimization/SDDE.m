@@ -294,11 +294,11 @@ classdef SDDE < handle
                     eligible_roots = [eligible_roots; root_archive(i,:)];
                 end
             end
-            
+
             if size(eligible_roots,1) >1
                 id_duplicated_roots = [];
-                for i = 1:length(eligible_roots)
-                    for j = i+1:length(eligible_roots)
+                for i = 1:size(eligible_roots,1)
+                    for j = i+1:size(eligible_roots,1)
                         if norm(eligible_roots(i,:) - eligible_roots(j,:)) < obj.delta
                             id_duplicated_roots = [id_duplicated_roots; [i, j]];
                         end
