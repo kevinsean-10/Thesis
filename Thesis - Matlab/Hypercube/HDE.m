@@ -1,24 +1,30 @@
 classdef HDE < handle   
     properties
-        boundaries
-        dim
-        population_size
-        max_generation
-        mutation_factor
-        crossover_rate
-        delta
-        epsilon
-        parts
-        seed
-        cluster
-        archive
-        score
-        final_root
-        final_score
+        boundaries % boundaries of the NES
+        dim % dimension of the NES
+        population_size % number of individuals per generation
+        max_generation % maximum generation/iteration
+        mutation_factor % scale factor constant
+        crossover_rate % crossover rate constant
+        delta % minimum distance of solution
+        epsilon % accuracy
+        parts % number of desired hypercubes in the boundaries (N)
+        seed % random state
+        cluster % set of choosen hypercubes
+        archive % set of solutions
+        score % set of solutions score
+        final_root % set of "cleaned" solutions
+        final_score % set of "cleaned" solutions score
+        hypercubes_edges % set of all hypercubes
+        fig % animation parameter
+        writerObj % animation parameter
     end
     
     methods
-        function obj = HDE(boundaries, population_size, parts, max_generation,mutation_factor, crossover_rate,epsilon, delta, seed)
+        % INITIALIZATION
+        function obj = HDE(boundaries, population_size, parts, ...
+                max_generation,mutation_factor, crossover_rate,epsilon, ...
+                delta, seed)
             obj.boundaries = boundaries;
             obj.dim = size(boundaries,1);
             obj.population_size = population_size;
@@ -26,6 +32,7 @@ classdef HDE < handle
             obj.parts = parts;
             obj.mutation_factor = mutation_factor;
             obj.crossover_rate = crossover_rate;
+            obj.hypercubes_edges = [];
             obj.epsilon = epsilon;
             obj.delta = delta;
             obj.seed = seed;
@@ -36,12 +43,12 @@ classdef HDE < handle
             obj.final_score = [];
         end
         
-        % % Problem 1
-        % function F_array = system_equations(obj,x)
-        %     f1 = exp(x(1)-x(2)) - sin(x(1)+x(2));
-        %     f2 = (x(1)*x(2))^2 - cos(x(1)+x(2));
-        %     F_array = [f1; f2];
-        % end
+        % Problem 1
+        function F_array = system_equations(obj,x)
+            f1 = exp(x(1)-x(2)) - sin(x(1)+x(2));
+            f2 = (x(1)*x(2))^2 - cos(x(1)+x(2));
+            F_array = [f1; f2];
+        end
 
         % % Problem 2
         % function F_array = system_equations(obj,x)
@@ -49,41 +56,35 @@ classdef HDE < handle
         %     f2 = (1 - 0.25 / pi) * (exp(2 * x(1)) - exp(1)) + exp(1) * x(2) / pi - 2 * exp(1) * x(1);
         %     F_array = [f1; f2];
         % end
-
-        % % Problem 4
+        
+        % % Problem 3
         % function F_array = system_equations(obj,x)
-        %     % g1 = x(1)*x(2)^3 / 12 - (x(1) - 2*x(3))*(x(2) - 2*x(3))^3 / 12 - 9369;
-        %     % g2 = 2*(x(2) - x(3))^2 * (x(1) - x(3))^2 * x(3) / (x(2) + x(1) - 2*x(3)) - 6835;
-        %     f1 = x(1)*x(2) - (x(1) - 2*x(3))*(x(2) - 2*x(3)) - 165;
-        %     f2 = x(1)*x(2)^3 / 12 - (x(1) - 2*x(3))*(x(2) - 2*x(3))^3 / 12 - 9369;
-        %     f3 = (2*((x(2)-x(3))^2)*((x(1)-x(3))^2)*x(3))/(x(2)+x(1)-2*x(3)) - 6835;
+        %     f1 = x(1)^2-x(1)-x(2)^2-x(2)+x(3)^2;
+        %     f2 = sin(x(2)-exp(x(1)));
+        %     f3 = x(3)-log(abs(x(2)));
         %     F_array = [f1; f2; f3];
         % end
 
-        % % Problem 5
-        % function F_array = system_equations(obj,x)
-        %     f1 = 2*x(1) + x(2) + x(3) + x(4) + x(5) - 6;
-        %     f2 = x(1) + 2*x(2) + x(3) + x(4) + x(5) - 6;
-        %     f3 = x(1) + x(2) + 2*x(3) + x(4) + x(5) - 6;
-        %     f4 = x(1) + x(2) + x(3) + 2*x(4) + x(5) - 6;
-        %     f5 = x(1)*x(2)*x(3)*x(4)*x(5) - 1;
-        %     F_array = [f1; f2;f3;f4;f5];
-        % end
-        
-        % Problem 7
-        function F_array = system_equations(obj,x)
-            f1 = x(1)^2-x(1)-x(2)^2-x(2)+x(3)^2;
-            f2 = sin(x(2)-exp(x(1)));
-            f3 = x(3)-log(abs(x(2)));
-            F_array = [f1; f2; f3];
-        end
-
+        % Objective Function
+        % INPUT
+        % x: vectors with dim size
+        % OUTPUT
+        % res: real number
         function res = objective_function(obj, x)
             F_array = obj.system_equations(x);
             res = sum(abs(F_array));
             res = -1 / (1 + res);
         end
 
+        % Generate population
+        % INPUT
+        % npoint: desired population size
+        % boundaries
+        % seed
+        % OUTPUT
+        % pop: structured array of position and cost of the population
+        % BestSol: structured array of position and cost of the best
+        % solution
         function [pop,BestSol] = generate_points(obj,npoint,boundaries,seed)
             rng(seed)
             dimension = size(boundaries,1);
@@ -107,6 +108,15 @@ classdef HDE < handle
             end
         end
 
+        % Mutation process of DE
+        % INPUT
+        % population: structured array
+        % F: scale factor of mutation
+        % VarSize: dimension of population
+        % boundaries
+        % permvec: randomized indices of population
+        % OUTPUT
+        % donor_vec: donor/mutate vector
         function donor_vec = mutate(obj,population,F,VarSize,boundaries, permvec)
             a = permvec(1);
             b = permvec(2);
@@ -119,6 +129,13 @@ classdef HDE < handle
             donor_vec = min(donor_vec, boundaries(:,2)');
         end
 
+        % Crossover process of DE
+        % INPUT
+        % original_vec: original vector
+        % donor_vec: donor vector
+        % crossover_rate: crossover rate
+        % OUTPUT
+        % trial: trial vector
         function trial = crossover(obj,original_vec,donor_vec,crossover_rate)
             trial = zeros(size(original_vec));
             j0 = randi([1 numel(original_vec)]);
@@ -131,12 +148,37 @@ classdef HDE < handle
             end
         end
 
-        function [population,BestSol] = DE(obj,population,BestSol,boundaries,MaxIt,F,pCR,verbose)
+        % Evaluation using DE to get the minimum solution
+        % INPUT
+        % population: structured array
+        % BestSol: structured array of previously found best position and cost
+        % boundaries
+        % MaxIt: maximum iteration
+        % F: scale factor
+        % pCR: crossover rate
+        % verbose: print properties
+        % visual_properties: visualization properties
+        % OUTPUT
+        % population: structured array
+        % BestSol: structured array of best position and cost
+        function [population,BestSol] = DE(obj,population,BestSol,boundaries,MaxIt,F,pCR,verbose,visual_properties)
             nPop = size(population,1);
             dimension = size(population(1).Position,2);
             VarSize = [1 dimension];
             BestCost = zeros(MaxIt, 1);
             for it = 1:MaxIt
+                if visual_properties.show_visual == true || visual_properties.save_visual == true
+                    pop_array = reshape([population.Position], dimension, [])';
+                    hold on
+                    pop_scatter = scatter(pop_array(:,1), pop_array(:,2), 10, 'filled', 'MarkerFaceAlpha', 0.3,'MarkerEdgeAlpha',0,'MarkerFaceColor','blue');
+                    hold off
+                    pause(0.005)
+                    if visual_properties.save_visual == true
+                        frame = getframe(gcf);
+                        writeVideo(obj.writerObj, frame);
+                    end
+                    delete (pop_scatter)
+                end
                 for i = 1:nPop
 
                     x = population(i).Position;
@@ -175,6 +217,13 @@ classdef HDE < handle
             end
         end
 
+        % slicing the domain into hypercubes
+        % INPUT
+        % lower_bounds, upper_bounds: array of lower and upper bounds
+        % parts: squared number to indicate the number of desired hypercubes in the domain
+        % OUTPUT
+        % res: set of hypercubes with size number of corner point of
+        % a single hypercube by number of hypercubes by dimension
         function res = slice_hypercube(obj, lower_bounds, upper_bounds, parts)
             interval = (upper_bounds-lower_bounds)/(parts);
             dimension = numel(lower_bounds);
@@ -205,14 +254,15 @@ classdef HDE < handle
             end
         end
 
+        % Selection process of hypercubes to identify which hypercube contains root
         function clustering(obj)
             lower_bounds = obj.boundaries(:,1); upper_bounds = obj.boundaries(:,2); 
             interval = (upper_bounds-lower_bounds)/(obj.parts);
             
-            hypercubes_edges = obj.slice_hypercube(lower_bounds,upper_bounds,obj.parts);
+            obj.hypercubes_edges = obj.slice_hypercube(lower_bounds,upper_bounds,obj.parts);
             
-            for hypercube_id = 1:size(hypercubes_edges, 2)
-                X0 = hypercubes_edges(:,hypercube_id,:);
+            for hypercube_id = 1:size(obj.hypercubes_edges, 2)
+                X0 = obj.hypercubes_edges(:,hypercube_id,:);
                 X0 = reshape(X0, [], size(X0, 3));
                 
                 F_list = zeros(obj.dim,size(X0,1));
@@ -220,6 +270,7 @@ classdef HDE < handle
                     F_list(:,i) = obj.system_equations(X0(i,:));
                 end
                 
+                % Selection process based of whether the f in NES changes sign or not
                 product_combination = zeros(size(F_list, 1), nchoosek(size(F_list, 2), 2));
                 for i = 1:size(F_list, 1)
                     combinations = nchoosek(F_list(i,:), 2);
@@ -235,14 +286,21 @@ classdef HDE < handle
             obj.cluster = cat(3, obj.cluster{:});
         end
 
+        % Root elimination of the previously found solution to eliminate the double roots
+        % INPUT
+        % root_archive: set of found solutions
+        % OUTPUT
+        % clean_roots: set of "cleaned" solutions
         function clean_roots = root_elimination(obj,root_archive)
             eligible_roots = [];
+            % root criterion
             for i = 1:size(root_archive,1)
                 if obj.objective_function(root_archive(i,:)) < -1 + obj.epsilon
                     eligible_roots = [eligible_roots; root_archive(i,:)];
                 end
             end
-            eligible_roots
+
+            % eliminate double roots
             if size(eligible_roots,1) >1
                 id_duplicated_roots = [];
                 for i = 1:length(eligible_roots)
@@ -280,9 +338,55 @@ classdef HDE < handle
             end
         end
 
-        function [final_root,final_score] = DE_evaluation(obj, verbose, superverbose)
+        % Evaluation of DE in the hypercubes that potentially contain root
+        % INPUT
+        % verbose: print properties of DE_evaluation
+        % superverbose: print properties of DE
+        % visual_properties: visualization properties
+        % OUTPUT
+        % final_root: location of solution with minimum score
+        % final_score: final_root's score
+        % num_cluster: number of hypercubes that potentially contain root
+        function [final_root,final_score,num_cluster] = DE_evaluation(obj, verbose, superverbose,visual_properties)
+            if visual_properties.save_visual == true
+                obj.writerObj = VideoWriter(visual_properties.file_name);
+                obj.writerObj.FrameRate = 5;  % Adjust the frame rate as needed
+                open(obj.writerObj);
+            end
+
+            % Create a figure with visibility off
+            if visual_properties.show_visual == false
+                fig = figure('Visible', 'off');
+            else 
+                fig = figure('Visible', 'on');
+            end
+            
             obj.clustering()
-            num_cluster = size(obj.cluster,1);
+            num_cluster = size(obj.cluster,3);
+
+            if visual_properties.show_visual == true || visual_properties.save_visual == true
+                % axis equal;
+                pbaspect([diff(xlim()) diff(ylim()) 1]);
+                
+                % Maximize figure window
+                set(gcf, 'WindowState', 'maximized');
+    
+                xlim(obj.boundaries(1,:));
+                ylim(obj.boundaries(2,:));
+                title(sprintf('N=%d',obj.parts^2),"FontSize",24)
+                hold on
+                rectangle('Position',[obj.boundaries(:,1)',(obj.boundaries(:,2)-obj.boundaries(:,1))'],'EdgeColor','#FF0000','LineWidth',5)
+                for i = 1:size(obj.hypercubes_edges, 2)
+                    subbound = zeros(obj.dim, 2);
+                    for d = 1:size(obj.hypercubes_edges, 3)
+                        subbound(d, :) = [min(obj.hypercubes_edges(:, i,d)), max(obj.hypercubes_edges(:, i,d))];
+                    end
+                    rectangle('Position',[subbound(:,1)',(subbound(:,2)-subbound(:,1))'],'EdgeColor','#F4A460')
+                end
+                hold off
+            end
+
+
             if verbose == true
                 fprintf("Number of clusters containing root: %d\n", size(obj.cluster, 3));
             end
@@ -291,23 +395,37 @@ classdef HDE < handle
                 for d = 1:size(obj.cluster, 2)
                     subbound(d, :) = [min(obj.cluster(:, d, i)), max(obj.cluster(:, d, i))];
                 end
+                if visual_properties.show_visual == true || visual_properties.save_visual == true
+                    rectangle('Position',[subbound(:,1)',(subbound(:,2)-subbound(:,1))'],'EdgeColor','#4DBEEE','LineWidth',3)
+                    pause(0.25)
+                    if visual_properties.save_visual == true
+                        frame = getframe(gcf);
+                        writeVideo(obj.writerObj, frame);
+                    end
+                end
                 [popbound,BestSol] = obj.generate_points(obj.population_size,subbound,obj.seed);
-                [~,BestSol] = obj.DE(popbound,BestSol,subbound,obj.max_generation,obj.mutation_factor,obj.crossover_rate,superverbose);
+                [~,BestSol] = obj.DE(popbound,BestSol,subbound,obj.max_generation,obj.mutation_factor,obj.crossover_rate,superverbose,visual_properties);
                 
                 obj.archive{end+1} = BestSol.Position;
                 obj.score(end+1) = BestSol.Cost;
+
+                % Convert cell array to matrix
+                archive_matrix = reshape([obj.archive{:}], obj.dim, [])';
+                if visual_properties.show_visual == true || visual_properties.save_visual == true
+                    hold on
+                    archive_scatter = scatter(archive_matrix(:,1),archive_matrix(:,2),'filled','MarkerEdgeAlpha',0,'MarkerFaceColor',[34, 65, 65]/255);
+                    hold off
+                    if visual_properties.save_visual == true
+                        frame = getframe(gcf);
+                        writeVideo(obj.writerObj, frame);
+                    end
+                end
                 
                 if verbose
                     fprintf('\n====== Cluster %d ======\n', i);
                     disp('Roots =');
                     disp(obj.archive);
                 end
-            end
-
-            % Convert cell array to matrix
-            archive_matrix = zeros(numel(obj.archive), numel(obj.archive{1}));
-            for i = 1:numel(obj.archive)
-                archive_matrix(i, :) = obj.archive{i};
             end
 
             final_root = obj.root_elimination(archive_matrix);
@@ -317,63 +435,22 @@ classdef HDE < handle
             end
             obj.final_root = final_root;
             obj.final_score = final_score;
-        end
 
-        function visualization2D(obj,visual_properties)
-            if visual_properties.save_visual == true
-                writerObj = VideoWriter(visual_properties.file_name);
-                writerObj.FrameRate = 5;  % Adjust the frame rate as needed
-                open(writerObj);
-            end
-
-            % Create a figure with visibility off
-            if visual_properties.show_visual == false
-                fig = figure('Visible', 'off');
-            else 
-                fig = figure('Visible', 'on');
-            end
-
-            % Adjust aspect ratio
-            axis equal;
-            pbaspect([diff(xlim()) diff(ylim()) 1]);
-            
-            % Maximize figure window
-            set(gcf, 'WindowState', 'maximized');
-
-            xlim(obj.boundaries(1,:));
-            ylim(obj.boundaries(2,:));
-            hold on
-            rectangle('Position',[obj.boundaries(:,1)',(obj.boundaries(:,2)-obj.boundaries(:,1))'],'EdgeColor','#FF0000')
-            for i = 1:size(obj.cluster, 3)
-                subbound = zeros(obj.dim, 2);
-                for d = 1:size(obj.cluster, 2)
-                    subbound(d, :) = [min(obj.cluster(:, d, i)), max(obj.cluster(:, d, i))];
-                end
-                
-                rectangle('Position',[subbound(:,1)',(subbound(:,2)-subbound(:,1))'],'EdgeColor','#4DBEEE')
+            if visual_properties.show_visual == true || visual_properties.save_visual == true
+                delete (archive_scatter);
+                hold on
+                plot(obj.final_root(:,1), obj.final_root(:,2),'*','Color','magenta','MarkerSize',20);      
+                hold off
                 pause(0.25)
                 if visual_properties.save_visual == true
                     frame = getframe(gcf);
-                    writeVideo(writerObj, frame);
+                    writeVideo(obj.writerObj, frame);
                 end
             end
-
-            for j = 1: size(obj.final_root,1)
-                plot(obj.final_root(j,1), obj.final_root(j,2), '*','Color','magenta');
-                pause(0.25)
-                if visual_properties.save_visual == true
-                    frame = getframe(gcf);
-                    writeVideo(writerObj, frame);
-                end
-            end
-            hold off
-
             if visual_properties.save_visual == true
-                close(writerObj);
+                close(obj.writerObj);
             end
-
         end
-
     end
 end
 

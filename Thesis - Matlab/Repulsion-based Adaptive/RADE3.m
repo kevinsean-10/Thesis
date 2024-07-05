@@ -1,26 +1,25 @@
-classdef RADE < handle
+classdef RADE3 < handle
     properties
-        boundaries % boundaries of the NES
-        dim % dimension of the NES
-        population_size % number of individuals per generation
-        num_per_subpopulation % number of individuals in the subpopulation
-        max_generation % maximum generation/iteration
-        theta % accuracy
-        tau_d % minimum distance of solution
-        beta % the repulsion constant 
-        rho % radius of the repulsion regions
-        archive % set of solutions
-        criterion % criterion of the roots (based on the objective function used)
-        max_archive_size % maximum size of the archive
-        memories_F % vectors of generated scale factor
-        memories_CR % vectors of generated crossover rate
-        max_memories_size % maximum size of the memories_F dan memories_CR
-        seed % random state
+        boundaries
+        dim
+        population_size
+        num_per_subpopulation
+        max_generation
+        theta
+        tau_d
+        beta
+        rho
+        archive
+        criterion
+        max_archive_size
+        memories_F
+        memories_CR
+        max_memories_size
+        seed
     end
     
     methods
-        % INITIALIZATION
-        function obj = RADE(boundaries,population_size, ...
+        function obj = RADE3(boundaries,population_size, ...
                 num_per_subpopulation,max_generation, ...
                 max_archive_size,theta,tau_d,F_init,CR_init, ...
                 max_memories_size,beta,rho,seed)
@@ -36,18 +35,18 @@ classdef RADE < handle
             obj.rho = rho;
             obj.tau_d = tau_d;
             obj.max_memories_size = max_memories_size;
-            obj.memories_F = ones(1, max_memories_size) * F_init; % set all F to be 0.5
-            obj.memories_CR = ones(1, max_memories_size) * CR_init; % set all CR to be 0.5
+            obj.memories_F = ones(1, max_memories_size) * F_init;
+            obj.memories_CR = ones(1, max_memories_size) * CR_init;
             obj.archive = [];
             obj.seed = seed;
         end
 
-        % Problem 1
-        function F_array = system_equations(obj,x)
-            f1 = exp(x(1)-x(2)) - sin(x(1)+x(2));
-            f2 = (x(1)*x(2))^2 - cos(x(1)+x(2));
-            F_array = [f1; f2];
-        end
+        % % Problem 1
+        % function F_array = system_equations(obj,x)
+        %     f1 = exp(x(1)-x(2)) - sin(x(1)+x(2));
+        %     f2 = (x(1)*x(2))^2 - cos(x(1)+x(2));
+        %     F_array = [f1; f2];
+        % end
 
         % % Problem 2
         % function F_array = system_equations(obj,x)
@@ -56,19 +55,14 @@ classdef RADE < handle
         %     F_array = [f1; f2];
         % end
 
-        % % Problem 3
-        % function F_array = system_equations(obj,x)
-        %     f1 = x(1)^2-x(1)-x(2)^2-x(2)+x(3)^2;
-        %     f2 = sin(x(2)-exp(x(1)));
-        %     f3 = x(3)-log(abs(x(2)));
-        %     F_array = [f1; f2; f3];
-        % end
+        % Problem 3
+        function F_array = system_equations(obj,x)
+            f1 = x(1)^2-x(1)-x(2)^2-x(2)+x(3)^2;
+            f2 = sin(x(2)-exp(x(1)));
+            f3 = x(3)-log(abs(x(2)));
+            F_array = [f1; f2; f3];
+        end
 
-        % Objective Function
-        % INPUT
-        % x: vectors with dim size
-        % OUTPUT
-        % res: real number
         function res = objective_function(obj, x)
             F_array = obj.system_equations(x);
             res = sum(abs(F_array));
@@ -76,13 +70,8 @@ classdef RADE < handle
             obj.criterion = -1 + obj.theta;
         end
 
-        % Characteristic Function 
-        % INPUT
-        % delta_j: euclidean distance between x and x* (found root)
-        % rho: radius of the repulsion region
-        % OUTPUT
-        % binary to be a decision of repulsion
         function result = chi_p(obj, delta_j, rho)
+            % Characteristic Function
             if delta_j <= rho
                 result = 1;
             else
@@ -90,11 +79,6 @@ classdef RADE < handle
             end
         end
 
-        % Repulsion Function
-        % INPUT
-        % x: vectors with dim size
-        % OUTPUT
-        % res: real number
         function Rx = repulsion_function(obj, x)
             % Repulsion Function
             f_x = obj.objective_function(x);
@@ -107,12 +91,8 @@ classdef RADE < handle
             Rx = Rx * obj.beta + f_x;
         end
 
-        % Fitness Function
-        % INPUT
-        % x: vectors with dim size
-        % OUTPUT
-        % res: real number
         function f_x = fitness_function(obj, x)
+            % Fitness Function
             if isempty(obj.archive)
                 f_x = obj.objective_function(x);
             else
@@ -120,15 +100,6 @@ classdef RADE < handle
             end
         end
 
-        % Generate population
-        % INPUT
-        % npoint: desired population size
-        % boundaries
-        % seed
-        % OUTPUT
-        % pop: structured array of position and cost of the population
-        % BestSol: structured array of position and cost of the best
-        % solution
         function [pop,BestSol] = generate_points(obj,npoint,boundaries,seed)
             rng(seed);
             dimension = size(boundaries,1);
@@ -152,15 +123,6 @@ classdef RADE < handle
             end
         end
 
-        % Mutation process of DE
-        % INPUT
-        % population: structured array
-        % F: scale factor of mutation
-        % VarSize: dimension of population
-        % boundaries
-        % permvec: randomized indices of population
-        % OUTPUT
-        % donor_vec: donor/mutate vector
         function donor_vec = mutate(obj,population,F,VarSize,boundaries, permvec)
             a = permvec(1);
             b = permvec(2);
@@ -173,13 +135,6 @@ classdef RADE < handle
             donor_vec = min(donor_vec, boundaries(:,2)');
         end
 
-        % Crossover process of DE
-        % INPUT
-        % original_vec: original vector
-        % donor_vec: donor vector
-        % crossover_rate: crossover rate
-        % OUTPUT
-        % trial: trial vector
         function trial = crossover(obj,original_vec,donor_vec,crossover_rate)
             trial = zeros(size(original_vec));
             j0 = randi([1 numel(original_vec)]);
@@ -192,14 +147,6 @@ classdef RADE < handle
             end
         end
 
-        % Establishment of subpopulation of an individual
-        % INPUT
-        % individual: individual target from which to establish the subpopulation
-        % population
-        % t: desired number of individuals in subpopulation
-        % OUTPUT
-        % subpop: array of subpopulation
-        % closest_indices: indices of subpop from population perspective
         function [subpop,closest_indices] = subpopulating(obj, individual, population, t)
             population_array = reshape([population.Position], obj.dim, [])';
             distances = sqrt(sum((population_array - individual) .^ 2, 2));
@@ -211,13 +158,14 @@ classdef RADE < handle
             % Form the subpopulation with the closest individuals
             subpop = population(closest_indices);
         end
-        
-        % Update the archive with a new individual x
-        % INPUT
-        % x: individual
-        % OUTPUT
-        % archive: updated archive
+
         function archive = update_archive(obj, x, archive)
+            % Update the archive with a new individual x
+            % Inputs:
+            % x: individual
+            % Outputs:
+            % archive: updated archive
+        
             f_x = obj.objective_function(x);
             s = size(archive,1); % current archive size
 
@@ -315,13 +263,6 @@ classdef RADE < handle
             end
         end
 
-        % Evaluation using DE in RADE to get the minimum solution
-        % INPUT
-        % verbose: print properties
-        % visual_properties: visualization properties
-        % OUTPUT
-        % final_root: location of solution with minimum score
-        % final_score: final_root's score
         function [final_root,final_score] = DE_evaluation(obj,verbose,visual_properties)
             rng(obj.seed);
             [population,bestsol] = obj.generate_points(obj.population_size,obj.boundaries,obj.seed);
@@ -338,12 +279,10 @@ classdef RADE < handle
                 fig = figure('Visible', 'off');
             else 
                 fig = figure('Visible', 'on');
-                [X_surf, Y_surf] = meshgrid(linspace(obj.boundaries(1,1),obj.boundaries(1,2),100),linspace(obj.boundaries(2,1),obj.boundaries(2,2),100));
-                XY_surf = [X_surf(:),Y_surf(:)];
-                Z_surf = zeros(size(XY_surf,1),1);
             end
 
             k=1;
+            updated_list = [0];
             memoriesF = [];
             memoriesCR = [];
             VarSize = [1 obj.dim];
@@ -399,58 +338,29 @@ classdef RADE < handle
                 end
 
                 if visual_properties.show_visual == true || visual_properties.save_visual == true
-                    xlim(obj.boundaries(1,:));
-                    ylim(obj.boundaries(2,:));
-                    % answ = [-6.437160, 0.155348;
-                    %         -0.932122, 1.067870;
-                    %         -0.155283, 6.439840;
-                    %          0.163333, 6.122430;
-                    %          0.667121, 0.690103;
-                    %         -6.117110, -0.163476];
-                    for i=1:size(XY_surf,1)
-                        Z_surf(i) = obj.repulsion_function(XY_surf(i,:));
-                    end
-                    Z_surf = reshape(Z_surf, size(X_surf));
-                    subplot(2, 2, 1);
-                    surf(X_surf, Y_surf, Z_surf);
-                    view(-20, 20);
-                    title("Tampak Samping")
-
-                    subplot(2, 2, 2);
+                    % subplot(1, 2, 1);
                     memoriesF = [memoriesF,obj.memories_F(k)];
                     memoriesCR = [memoriesCR,obj.memories_CR(k)];
                     hold on
-                    plot(0:gen-1,memoriesF,'Color','magenta')
-                    plot(0:gen-1,memoriesCR,'Color','green')
+                    plot(0:gen-1,memoriesF,'Color','magenta','LineWidth',5)
+                    plot(0:gen-1,memoriesCR,'Color','green','LineWidth',5)
                     legend(["F",'CR'], 'Location', 'southwest')
                     hold off
                     ylim([0,1])
                     title("Parameter F dan CR")
                     grid on;
+                    % 
+                    % subplot(1, 2, 2);
+                    % plot(0:gen-1,updated_list,"Color",'red');
+                    % title("Tingkat Disrupsi")
+                    % grid on;
 
-                    subplot(2, 2, 3);
-                    % scatter(answ(:,1),answ(:,2), 50,"MarkerEdgeColor","#EDB120","LineWidth",2);
-                    % hold on;
-                    population_array = reshape([population.Position], obj.dim, [])';
-                    scatter(population_array(:,1), population_array(:,2), 5, 'filled','blue'); 
-                    % hold off;
-                    rectangle('Position',[obj.boundaries(:,1)',(obj.boundaries(:,2)-obj.boundaries(:,1))'],'EdgeColor','#FF0000')
-                    grid on;
+                    % Maximize figure window
+                    set(gcf, 'WindowState', 'maximized');
                 end
 
                 if visual_properties.show_visual == true || visual_properties.save_visual == true
-                    % Adjust aspect ratio
-                    % axis equal;
-                    % pbaspect([diff(xlim()) diff(ylim()) 1]);
-        
-                    % Maximize figure window
-                    set(gcf, 'WindowState', 'maximized');
-                    if ~isempty(obj.archive)
-                        hold on
-                        plot(obj.archive(:,1), obj.archive(:,2),'*',"color",'#EDB120',"MarkerSize",50);
-                        hold off
-                    end
-                    title(sprintf("Generation %d",gen))
+
                     pause(0.01)
                     if visual_properties.save_visual == true
                         frame = getframe(gcf);
@@ -458,6 +368,7 @@ classdef RADE < handle
                     end
                 end
 
+                updated_list = [updated_list;updated];
             end
             final_root = obj.archive;
             final_score = zeros(1, size(final_root,1));

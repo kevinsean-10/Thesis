@@ -1,20 +1,36 @@
+%% Trial
 clear;clc;close all;
 
-parts = round(sqrt(100));
-max_gen = 100;
+sq_pt = 250;
+parts = round(sqrt(sq_pt));
+max_gen = 400;
 
 epsilon = 1e-6;
-delta = 0.01;
+tau_d = 0.01;
 pop_size = 300;
 dim = 3;
-mutation_factor=0.8;
-crossover_rate=0.8;
+mutation_factor=0.831987414;
+crossover_rate=0.887292888;
 seed = 'shuffle';
 print_stat = false;
-verbose = true;
+verbose = false;
 visual_properties = struct('show_visual',false, ...
     'save_visual', false, ...
     'file_name', 'hde.avi');
+
+
+print_stat = false;
+verbose = true;
+
+rngseed = rng(seed);
+disp(rngseed.Seed)
+basename = 'hde';
+us = '_';
+extension = '.avi';
+
+visual_properties = struct('show_visual',false, ...
+    'save_visual', false, ...
+    'file_name', [basename,us,num2str(sq_pt),us,num2str(max_gen),us,num2str(rngseed.Seed),extension]);
 
 
 % Define boundaries
@@ -24,17 +40,15 @@ visual_properties = struct('show_visual',false, ...
 % boundaries = [-1,3;-17,4];
 % % Problem 4
 % boundaries = repmat([-40, 40], dim, 1);
-% Problem 7
+% % Problem 7
 boundaries = [0,2;-10,10;-1,1];
 
-hdeopt = HDE(boundaries,pop_size,parts,max_gen,mutation_factor,crossover_rate,epsilon,delta,seed);
+hdeopt = HDE(boundaries,pop_size,parts,max_gen,mutation_factor,crossover_rate,epsilon,tau_d,seed);
 
-[final_root,final_score] = hdeopt.DE_evaluation(verbose,print_stat)
+[final_root,final_score,num_cluster] = hdeopt.DE_evaluation(verbose,print_stat,visual_properties)
 % hdeopt.visualization2D(visual_properties)
 % pause(5);
 % close;
-
-
 
 
 %% Exporting Statistic
@@ -45,7 +59,7 @@ parts = round(sqrt(squared_parts));
 max_gen = [100,250,400];
 
 epsilon = 1e-6;
-delta = 0.1;
+tau_d = 0.1;
 pop_size = 300;
 dim = 3;
 mutation_factor=0.831987414;
@@ -94,7 +108,7 @@ for gm = 1: size(max_gen,2)
                 'file_name', [basename,us,num2str(squared_parts(pt)),us,num2str(max_gen(gm)),us,num2str(iter),us,num2str(rngseed.Seed),extension]);
                 tic;
 
-                hdeopt = HDE(boundaries,pop_size,parts(pt),max_gen(gm),mutation_factor,crossover_rate,epsilon,delta,seed);
+                hdeopt = HDE(boundaries,pop_size,parts(pt),max_gen(gm),mutation_factor,crossover_rate,epsilon,tau_d,seed);
                 [final_root,final_score,num_cluster] = hdeopt.DE_evaluation(verbose,print_stat);
                 num_root = size(final_root,1);
                 best_score = min(final_score);
@@ -128,10 +142,105 @@ for gm = 1: size(max_gen,2)
     end
 end
 writematrix(failedIndices,['failed_indices',xlsx],'Sheet','Failed Indices')
-failedIndices
 disp('-end-')
 
-%%
-a = [2,1]
-size(a,1)
+%% Experimentation
+% clc;
+% he = hdeopt.slice_hypercube(boundaries(:,1),boundaries(:,2),parts)
+% cluster = {};
+% for hypercube_id = 1:size(he, 2)
+%     X0 = he(:,hypercube_id,:);
+%     X0 = reshape(X0, [], size(X0, 3));
+% 
+%     F_list = zeros(dim,size(X0,1));
+%     for i = 1:size(X0,1)
+%         F_list(:,i) = hdeopt.system_equations(X0(i,:));
+%     end
+% 
+%     product_combination = zeros(size(F_list, 1), nchoosek(size(F_list, 2), 2));
+%     for i = 1:size(F_list, 1)
+%         combinations = nchoosek(F_list(i,:), 2);
+%         product_combination(i,:) = prod(combinations, 2)';
+%     end
+%     change_sign_1 = any(product_combination < 0, 1);
+%     change_sign_2 = any(product_combination < 0, 2);
+%     if all(change_sign_2)
+%         cluster{end+1} = X0;
+%     end
+% end
+% cluster = cat(3, cluster{:})
 
+
+% %%
+% clc;
+% X0 = cluster(:,:,3) %3,6,8,9,13,14
+% 
+% distances = squareform(pdist(X0))
+% 
+% dist_pair = [];
+% for u=1:2^dim
+%     [~,si]=sort(distances(u,:));
+%     v = si(2:1+dim);
+%     [U, V] = meshgrid(u, v);
+%     combined_array = [U(:), V(:)];
+%     dist_pair = [dist_pair;combined_array];
+% end
+% 
+% sorted_dist_pair = sort(dist_pair, 2);
+% unique_dist_pair = unique(sorted_dist_pair, 'rows')
+% product_edge = zeros(dim,size(unique_dist_pair,1));
+% for i = 1:size(unique_dist_pair,1)
+%     fun1 = hdeopt.system_equations(X0(unique_dist_pair(i,1),:));
+%     fun2 = hdeopt.system_equations(X0(unique_dist_pair(i,2),:));
+%     product_edge(:,i) = fun1.*fun2;
+% end
+% product_edge
+% product_edge<0
+% a = any(product_edge<0,1)
+% 
+% %%
+% 
+% u = 1;
+% v = [2, 4, 6];
+% 
+% [U, V] = meshgrid(u, v)
+% 
+% % Combine U and V into a 2D array
+% combined_array = [U(:), V(:)]
+% 
+% %%
+% clc;
+% X0 = cluster(:,:,1) %3,6,8,9,13,14
+% % X0 = [-10,-10;-10,-9;-9,-9;-9,-10]
+% sides = getHypercubeSides(X0)
+% f_value = zeros(dim,size(sides,3));
+% i = 1;
+% for d3 = 1:size(sides,3)
+%     f_value(:,d3) = hdeopt.system_equations(sides(1,:,d3)).*hdeopt.system_equations(sides(2,:,d3));
+% end
+% 
+% f_value
+% 
+% 
+% %%
+% clc;
+% 
+% ideal = [0.75,0.875;-1.25,0;-0.25,-0.125];
+% 
+% hpc = [
+%     0.75,-1.25,-0.25;
+%     0.75,-1.25,-0.125;
+%     0.75,0,-0.25;
+%     0.75,0,-0.125;
+%     0.875,-1.25,-0.25;
+%     0.875,-1.25,-0.125;
+%     0.875,0,-0.25;
+%     0.875,0,-0.125
+%     ]
+% 
+% sides = getHypercubeSides(hpc);
+% f_value = zeros(dim,size(sides,3));
+% for d3 = 1:size(sides,3)
+%     f_value(:,d3) = hdeopt.system_equations(sides(1,:,d3)).*hdeopt.system_equations(sides(2,:,d3));
+% end
+% f_value

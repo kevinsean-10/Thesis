@@ -36,8 +36,8 @@ classdef RADE < handle
             obj.rho = rho;
             obj.tau_d = tau_d;
             obj.max_memories_size = max_memories_size;
-            obj.memories_F = ones(1, max_memories_size) * F_init; % set all F to be 0.5
-            obj.memories_CR = ones(1, max_memories_size) * CR_init; % set all CR to be 0.5
+            obj.memories_F = ones(1, max_memories_size) * F_init;
+            obj.memories_CR = ones(1, max_memories_size) * CR_init;
             obj.archive = [];
             obj.seed = seed;
         end
@@ -196,10 +196,9 @@ classdef RADE < handle
         % INPUT
         % individual: individual target from which to establish the subpopulation
         % population
-        % t: desired number of individuals in subpopulation
+        % 
         % OUTPUT
-        % subpop: array of subpopulation
-        % closest_indices: indices of subpop from population perspective
+
         function [subpop,closest_indices] = subpopulating(obj, individual, population, t)
             population_array = reshape([population.Position], obj.dim, [])';
             distances = sqrt(sum((population_array - individual) .^ 2, 2));
@@ -211,13 +210,14 @@ classdef RADE < handle
             % Form the subpopulation with the closest individuals
             subpop = population(closest_indices);
         end
-        
-        % Update the archive with a new individual x
-        % INPUT
-        % x: individual
-        % OUTPUT
-        % archive: updated archive
+
         function archive = update_archive(obj, x, archive)
+            % Update the archive with a new individual x
+            % Inputs:
+            % x: individual
+            % Outputs:
+            % archive: updated archive
+        
             f_x = obj.objective_function(x);
             s = size(archive,1); % current archive size
 
@@ -315,13 +315,6 @@ classdef RADE < handle
             end
         end
 
-        % Evaluation using DE in RADE to get the minimum solution
-        % INPUT
-        % verbose: print properties
-        % visual_properties: visualization properties
-        % OUTPUT
-        % final_root: location of solution with minimum score
-        % final_score: final_root's score
         function [final_root,final_score] = DE_evaluation(obj,verbose,visual_properties)
             rng(obj.seed);
             [population,bestsol] = obj.generate_points(obj.population_size,obj.boundaries,obj.seed);

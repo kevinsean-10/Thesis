@@ -56,12 +56,34 @@ classdef DE_class < handle
             end
         end
 
-        function [population,BestSol] = DE(obj,population,BestSol,boundaries,MaxIt,F,pCR,verbose)
+        function [population,BestSol] = DE(obj,population,BestSol,boundaries,MaxIt,F,pCR,verbose,visual_properties)
+            if visual_properties.save_visual == true
+                writerObj = VideoWriter(visual_properties.file_name);
+                writerObj.FrameRate = 5;  % Adjust the frame rate as needed
+                open(writerObj);
+            end
+
+            % Create a figure with visibility off
+            if visual_properties.show_visual == false
+                fig = figure('Visible', 'off');
+            else 
+                fig = figure('Visible', 'on');
+            end
+
             nPop = size(population,1);
             dimension = size(population(1).Position,2);
             VarSize = [1 dimension];
             BestCost = zeros(MaxIt, 1);
             for it = 1:MaxIt
+                if visual_properties.show_visual == true || visual_properties.save_visual == true
+                    pop_array = reshape([population.Position], dimension, [])';
+                    scatter(pop_array(:,1), pop_array(:,2), 10, 'filled', 'MarkerFaceAlpha', 0.3,'MarkerEdgeAlpha',0);
+                    rectangle('Position', [obj.boundaries(1,1), obj.boundaries(2,1), obj.boundaries(1,2) - obj.boundaries(1,1), obj.boundaries(2,2) - obj.boundaries(2,1)], 'EdgeColor', '#FF0000', 'LineWidth', 1);
+
+                    xlim(obj.boundaries(1,:));
+                    ylim(obj.boundaries(2,:));
+                    pause(0.025)
+                end
                 for i = 1:nPop
 
                     x = population(i).Position;
